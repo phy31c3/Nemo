@@ -1,13 +1,20 @@
 package kr.co.plasticcity.nemo.demo
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+import kotlinx.android.synthetic.main.activity_main.*
+import kr.co.plasticcity.nemo.demo.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity()
 {
 	override fun onCreate(savedInstanceState: Bundle?)
 	{
 		super.onCreate(savedInstanceState)
-		setContentView(R.layout.activity_main)
+		ActivityMainBinding.inflate(layoutInflater).also { binding ->
+			setContentView(binding.root)
+			recyclerView {
+			
+			}
+		}
 	}
 }
