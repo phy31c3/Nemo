@@ -1,0 +1,36 @@
+###############################################################################################################################################
+### NemoRecyclerView ##########################################################################################################################
+###############################################################################################################################################
+
+val header : NemoRecyclerView.Model.Singleton = NemoRecyclerView.Model(headerDTO)
+val accounts : NemoRecyclerView.Model.MutableList = NemoRecyclerView.Model(accountDTOs) { acno + bkcd } // key: if not define then key is hashcode or null
+val groups = nemoRecyclerView(orientation = VERTICAL) {
+    useSnap = false
+    group(model = header, view = HeaderItemBinding::class, tag = "header") {
+        bind { model, view, groupPos, globalPos ->
+            // define
+        }
+        placeHolder(num = 2) { view, groupPos, globalPos ->
+            // define
+        }
+        divider {
+            sizeDp = 3,
+            color = 0xff00ff00,
+            colorRes = R.color.divider,
+            drawableRes = R.drawable.divider,
+            position = MIDDLE
+        }
+        allowDragAndDrop = false
+        allowSwipeToDismiss = false
+    }
+    space {
+        sizeDp = 100,
+        color = 0xff00ff00,
+        colorRes = R.color.divider,
+        fillViewport = true,
+        fillWeight = 1
+    }
+    group(model = accounts, ...) {
+        ...
+    }
+}
