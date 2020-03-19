@@ -13,7 +13,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	
 	companion object
 	{
-		fun <M> model(model: M, key: (M.() -> Any?)? = null): Model.Singleton<M?>
+		fun <M> model(model: M, key: (M.() -> Any?)? = null): Model.Singleton<M>
 		{
 			TODO()
 		}
@@ -107,6 +107,10 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	interface Model<M>
 	{
 		interface Singleton<M> : Model<M>
+		{
+			var value: M
+		}
+		
 		interface List<M> : Model<M>, kotlin.collections.List<M>
 		interface MutableList<M> : Model<M>, kotlin.collections.MutableList<M>
 	}

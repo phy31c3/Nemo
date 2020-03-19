@@ -14,8 +14,12 @@ class MainActivity : AppCompatActivity()
 		super.onCreate(savedInstanceState)
 		ActivityMainBinding.inflate(layoutInflater).also { binding ->
 			setContentView(binding.root)
-			val header = NemoRecyclerView.model("null") { this }
-			val accounts = NemoRecyclerView.model<String>(listOf("", "")) { hashCode() }
+			val header = NemoRecyclerView.model<String?>(null) { this }
+			val accounts = NemoRecyclerView.model<String>(mutableListOf()) { hashCode() }
+			header.value = "header"
+			accounts.add("item1")
+			accounts.add("item2")
+			accounts.add("item3")
 			val groups = recyclerView(orientation = RecyclerView.VERTICAL, reverseLayout = false) {
 				useSnap = false
 				group(model = header, view = ActivityMainBinding::class, tag = "header") {
