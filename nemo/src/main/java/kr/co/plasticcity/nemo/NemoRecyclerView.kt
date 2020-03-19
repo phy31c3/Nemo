@@ -13,50 +13,6 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	@DslMarker
 	internal annotation class Marker
 	
-	companion object
-	{
-		fun <M> model(model: M, key: (M.() -> Any?)? = null): Model.Singleton<M>
-		{
-			TODO()
-		}
-		
-		fun <M> model(list: List<M>, key: (M.() -> Any?)? = null): Model.List<M>
-		{
-			TODO()
-		}
-		
-		fun <M> model(list: MutableList<M>, key: (M.() -> Any?)? = null): Model.MutableList<M>
-		{
-			TODO()
-		}
-	}
-	
-	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL, reverseLayout: Boolean = false, block: Define.() -> Unit): GroupArrange = GroupArrangeImpl().also { groups ->
-		val adapter = AdapterImpl(groups)
-		object : Define
-		{
-			override var useSnap: Boolean
-				get() = TODO("not implemented")
-				set(value)
-				{
-				}
-			
-			override fun <M, V : ViewBinding> group(model: Model<M>, view: KClass<V>, tag: Any?, block: GroupDefine<M, V>.() -> Unit)
-			{
-				TODO("not implemented")
-			}
-			
-			override fun space(block: SpaceDefine.() -> Unit)
-			{
-				TODO("not implemented")
-			}
-		}.apply {
-			block()
-			this@NemoRecyclerView.layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
-			this@NemoRecyclerView.adapter = adapter
-		}
-	}
-	
 	@Marker
 	interface Define
 	{
@@ -136,6 +92,50 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 		
 		interface List<M> : Model<M>, kotlin.collections.List<M>
 		interface MutableList<M> : List<M>, kotlin.collections.MutableList<M>
+	}
+	
+	companion object
+	{
+		fun <M> model(model: M, key: (M.() -> Any?)? = null): Model.Singleton<M>
+		{
+			TODO()
+		}
+		
+		fun <M> model(list: List<M>, key: (M.() -> Any?)? = null): Model.List<M>
+		{
+			TODO()
+		}
+		
+		fun <M> model(list: MutableList<M>, key: (M.() -> Any?)? = null): Model.MutableList<M>
+		{
+			TODO()
+		}
+	}
+	
+	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL, reverseLayout: Boolean = false, block: Define.() -> Unit): GroupArrange = GroupArrangeImpl().also { groups ->
+		val adapter = AdapterImpl(groups)
+		object : Define
+		{
+			override var useSnap: Boolean
+				get() = TODO("not implemented")
+				set(value)
+				{
+				}
+			
+			override fun <M, V : ViewBinding> group(model: Model<M>, view: KClass<V>, tag: Any?, block: GroupDefine<M, V>.() -> Unit)
+			{
+				TODO("not implemented")
+			}
+			
+			override fun space(block: SpaceDefine.() -> Unit)
+			{
+				TODO("not implemented")
+			}
+		}.apply {
+			block()
+			this@NemoRecyclerView.layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
+			this@NemoRecyclerView.adapter = adapter
+		}
 	}
 }
 
