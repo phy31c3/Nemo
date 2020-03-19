@@ -2,9 +2,9 @@
 ### NemoRecyclerView ##########################################################################################################################
 ###############################################################################################################################################
 
-val header : NemoRecyclerView.Model.Singleton = NemoRecyclerView.Model(headerDTO)
-val accounts : NemoRecyclerView.Model.MutableList = NemoRecyclerView.Model(accountDTOs) { acno + bkcd } // key: if not define then key is hashcode or null
-val groups = nemoRecyclerView(orientation = VERTICAL, reverseLayout = false) {
+val header = NemoRecyclerView.model(headerDTO)
+val accounts = NemoRecyclerView.model<AccountDTO>(accountDTOs) { acno + bkcd } // key: if not define then key is hashcode or null
+val groups = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout = false) {
     useSnap = false
     group(model = header, view = HeaderItemBinding::class, tag = "header") {
 		allowDragAndDrop = false
@@ -18,21 +18,26 @@ val groups = nemoRecyclerView(orientation = VERTICAL, reverseLayout = false) {
             println(globalPos)
         }
         divider {
-            sizeDp = 3,
-            color = 0xff00ff00,
-            colorRes = R.color.divider,
-            drawableRes = R.drawable.divider,
-            position = { BEGINNING and MIDDLE and END }
+            sizeDp = 3
+            color = "#ff00ff00"
+            colorRes = R.color.divider
+            drawableRes = R.drawable.divider
+            show = { BEGINNING and MIDDLE and END }
         }
     }
     space {
-        sizeDp = 100,
-        color = 0xff00ff00,
-        colorRes = R.color.divider,
-        fillViewport = true,
+        sizeDp = 100
+        color = "#ff00ff00"
+        colorRes = R.color.divider
+        fillViewport = true
         fillWeight = 1
     }
     group(model = accounts, ...) {
         ...
     }
 }
+groups.bringForward("header")
+groups.bringToFront("header")
+groups.sendBackward("header")
+groups.sendToBack("header")
+groups.swap("header", "list")
