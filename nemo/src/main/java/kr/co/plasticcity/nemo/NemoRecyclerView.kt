@@ -11,7 +11,7 @@ import kotlin.reflect.KClass
 class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : RecyclerView(context, attrs, defStyleAttr)
 {
 	@DslMarker
-	internal annotation class Marker
+	private annotation class Marker
 	
 	@Marker
 	interface Define
