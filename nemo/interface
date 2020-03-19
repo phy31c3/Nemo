@@ -7,13 +7,7 @@ val accounts = NemoRecyclerView.model<AccountDTO>(accountDTOs) { acno + bkcd } /
 val groups = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout = false) {
     useSnap = false
     group(model = header, view = HeaderItemBinding::class, tag = "header") {
-		allowDragAndDrop = false
-		allowSwipeToDismiss = false
         bind { data, binding ->
-            println(groupPos)
-            println(globalPos)
-        }
-        placeHolder(num = 2) { binding ->
             println(groupPos)
             println(globalPos)
         }
@@ -32,8 +26,17 @@ val groups = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout
         fillViewport = true
         fillWeight = 1
     }
-    group(model = accounts, ...) {
-        ...
+    group(model = accounts, view = HeaderItemBinding::class, tag = "list") {
+		allowDragAndDrop = false
+		allowSwipeToDismiss = false
+		bind { data, binding ->
+			println(groupPos)
+			println(globalPos)
+		}
+		placeHolder(num = 2) { binding ->
+			println(groupPos)
+			println(globalPos)
+		}
     }
 }
 groups.bringForward("header")

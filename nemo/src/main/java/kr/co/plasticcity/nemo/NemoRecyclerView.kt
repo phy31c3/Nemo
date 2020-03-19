@@ -39,19 +39,25 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	{
 		var useSnap: Boolean
 		
+		fun <M, V : ViewBinding> group(model: Model.Singleton<M>, view: KClass<V>, tag: Any? = null, block: SingleGroupDefine<M, V>.() -> Unit)
 		fun <M, V : ViewBinding> group(model: Model<M>, view: KClass<V>, tag: Any? = null, block: GroupDefine<M, V>.() -> Unit)
 		fun space(block: SpaceDefine.() -> Unit)
 	}
 	
 	@Marker
-	interface GroupDefine<M, V : ViewBinding>
+	interface SingleGroupDefine<M, V : ViewBinding>
+	{
+		fun bind(block: Bind.(data: M, binding: V) -> Unit)
+		fun divider(block: Divider.() -> Unit)
+	}
+	
+	@Marker
+	interface GroupDefine<M, V : ViewBinding> : SingleGroupDefine<M, V>
 	{
 		var allowDragAndDrop: Boolean
 		var allowSwipeToDismiss: Boolean
 		
-		fun bind(block: Bind.(data: M, binding: V) -> Unit)
 		fun placeHolder(num: Int = 1, block: Bind.(binding: V) -> Unit)
-		fun divider(block: Divider.() -> Unit)
 	}
 	
 	@Marker

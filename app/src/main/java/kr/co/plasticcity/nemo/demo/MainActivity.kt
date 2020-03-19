@@ -19,13 +19,7 @@ class MainActivity : AppCompatActivity()
 			val groups = recyclerView(orientation = RecyclerView.VERTICAL, reverseLayout = false) {
 				useSnap = false
 				group(model = header, view = ActivityMainBinding::class, tag = "header") {
-					allowDragAndDrop = false
-					allowSwipeToDismiss = false
 					bind { data, binding ->
-						println(groupPos)
-						println(globalPos)
-					}
-					placeHolder(num = 2) { binding ->
 						println(groupPos)
 						println(globalPos)
 					}
@@ -45,7 +39,16 @@ class MainActivity : AppCompatActivity()
 					fillWeight = 1f
 				}
 				group(model = accounts, view = ActivityMainBinding::class) {
-				
+					allowDragAndDrop = false
+					allowSwipeToDismiss = false
+					bind { data, binding ->
+						println(groupPos)
+						println(globalPos)
+					}
+					placeHolder(num = 2) { binding ->
+						println(groupPos)
+						println(globalPos)
+					}
 				}
 			}
 			groups.bringForward("header")
