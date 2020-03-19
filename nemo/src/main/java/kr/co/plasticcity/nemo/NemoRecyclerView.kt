@@ -32,8 +32,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	}
 	
 	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL, reverseLayout: Boolean = false, block: Define.() -> Unit): GroupArrange = GroupArrangeImpl().also { groups ->
-		val adapter = AdapterImpl()
-		val layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
+		val adapter = AdapterImpl(groups)
 		object : Define
 		{
 			override var useSnap: Boolean
@@ -41,11 +40,6 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 				set(value)
 				{
 				}
-			
-			override fun <M, V : ViewBinding> group(model: Model.Singleton<M>, view: KClass<V>, tag: Any?, block: SingleGroupDefine<M, V>.() -> Unit)
-			{
-				TODO("not implemented")
-			}
 			
 			override fun <M, V : ViewBinding> group(model: Model<M>, view: KClass<V>, tag: Any?, block: GroupDefine<M, V>.() -> Unit)
 			{
@@ -58,8 +52,8 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 			}
 		}.apply {
 			block()
+			this@NemoRecyclerView.layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
 			this@NemoRecyclerView.adapter = adapter
-			this@NemoRecyclerView.layoutManager = layoutManager
 		}
 	}
 	
@@ -68,7 +62,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	{
 		var useSnap: Boolean
 		
-		fun <M, V : ViewBinding> group(model: Model.Singleton<M>, view: KClass<V>, tag: Any? = null, block: SingleGroupDefine<M, V>.() -> Unit)
+		fun <M, V : ViewBinding> group(model: Model.Singleton<M>, view: KClass<V>, tag: Any? = null, block: SingleGroupDefine<M, V>.() -> Unit) = group(model, view, tag, block as GroupDefine<M, V>.() -> Unit)
 		fun <M, V : ViewBinding> group(model: Model<M>, view: KClass<V>, tag: Any? = null, block: GroupDefine<M, V>.() -> Unit)
 		fun space(block: SpaceDefine.() -> Unit)
 	}
@@ -297,7 +291,7 @@ private class MutableListImpl<M> : NemoRecyclerView.Model.MutableList<M>
 /*###################################################################################################################################
  * Adapter
  *###################################################################################################################################*/
-private class AdapterImpl : RecyclerView.Adapter<RecyclerView.ViewHolder>()
+private class AdapterImpl(val groups: GroupArrangeImpl) : RecyclerView.Adapter<RecyclerView.ViewHolder>()
 {
 	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder
 	{
