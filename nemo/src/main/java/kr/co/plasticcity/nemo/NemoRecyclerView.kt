@@ -18,8 +18,8 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	{
 		var useSnap: Boolean
 		
-		fun <M, V : ViewBinding> group(model: Model.Singleton<M>, view: KClass<V>, tag: Any? = null, block: SingleGroupDefine<M, V>.() -> Unit) = group(model, view, tag, block as GroupDefine<M, V>.() -> Unit)
-		fun <M, V : ViewBinding> group(model: Model<M>, view: KClass<V>, tag: Any? = null, block: GroupDefine<M, V>.() -> Unit)
+		fun <M, V : ViewBinding> group(model: Model.Singleton<M>, view: KClass<V>, tag: Any = Any(), block: SingleGroupDefine<M, V>.() -> Unit) = group(model, view, tag, block as GroupDefine<M, V>.() -> Unit)
+		fun <M, V : ViewBinding> group(model: Model<M>, view: KClass<V>, tag: Any = Any(), block: GroupDefine<M, V>.() -> Unit)
 		fun space(block: SpaceDefine.() -> Unit)
 	}
 	
@@ -27,7 +27,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	interface SingleGroupDefine<M, V : ViewBinding>
 	{
 		fun bind(block: Bind.(data: M, binding: V) -> Unit)
-		fun divider(block: Divider.() -> Unit)
+		fun divider(block: DividerDefine.() -> Unit)
 	}
 	
 	@Marker
@@ -47,7 +47,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	}
 	
 	@Marker
-	interface Divider
+	interface DividerDefine
 	{
 		var sizeDp: Int
 		var color: String
@@ -112,8 +112,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 		}
 	}
 	
-	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL, reverseLayout: Boolean = false, block: Define.() -> Unit): GroupArrange = GroupArrangeImpl().also { groups ->
-		val adapter = AdapterImpl(groups)
+	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL, reverseLayout: Boolean = false, block: Define.() -> Unit): GroupArrange = Core().also { core ->
 		object : Define
 		{
 			override var useSnap: Boolean
@@ -122,28 +121,112 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 				{
 				}
 			
-			override fun <M, V : ViewBinding> group(model: Model<M>, view: KClass<V>, tag: Any?, block: GroupDefine<M, V>.() -> Unit)
+			override fun <M, V : ViewBinding> group(model: Model<M>, view: KClass<V>, tag: Any, block: GroupDefine<M, V>.() -> Unit) = object : GroupDefine<M, V>
 			{
-				TODO("not implemented")
-			}
+				override var allowDragAndDrop: Boolean
+					get() = TODO("not implemented")
+					set(value)
+					{
+					}
+				override var allowSwipeToDismiss: Boolean
+					get() = TODO("not implemented")
+					set(value)
+					{
+					}
+				
+				override fun bind(block: Bind.(data: M, binding: V) -> Unit)
+				{
+					TODO("not implemented")
+				}
+				
+				override fun placeHolder(num: Int, block: Bind.(binding: V) -> Unit)
+				{
+					TODO("not implemented")
+				}
+				
+				override fun divider(block: DividerDefine.() -> Unit) = object : DividerDefine
+				{
+					override var sizeDp: Int
+						get() = TODO("not implemented")
+						set(value)
+						{
+						}
+					override var color: String
+						get() = TODO("not implemented")
+						set(value)
+						{
+						}
+					override var colorRes: Int
+						get() = TODO("not implemented")
+						set(value)
+						{
+						}
+					override var drawableRes: Int
+						get() = TODO("not implemented")
+						set(value)
+						{
+						}
+					override var show: DividerDefine.Position.() -> Int
+						get() = TODO("not implemented")
+						set(value)
+						{
+						}
+				}.block()
+			}.block()
 			
-			override fun space(block: SpaceDefine.() -> Unit)
+			override fun space(block: SpaceDefine.() -> Unit) = object : SpaceDefine
 			{
-				TODO("not implemented")
-			}
+				override var sizeDp: Int
+					get() = TODO("not implemented")
+					set(value)
+					{
+					}
+				override var color: String
+					get() = TODO("not implemented")
+					set(value)
+					{
+					}
+				override var colorRes: Int
+					get() = TODO("not implemented")
+					set(value)
+					{
+					}
+				override var fillViewport: Boolean
+					get() = TODO("not implemented")
+					set(value)
+					{
+					}
+				override var fillWeight: Float
+					get() = TODO("not implemented")
+					set(value)
+					{
+					}
+			}.block()
 		}.apply {
 			block()
 			this@NemoRecyclerView.layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
-			this@NemoRecyclerView.adapter = adapter
+			this@NemoRecyclerView.adapter = core.adapter
 		}
 	}
 }
 
 /*###################################################################################################################################
- * GroupArrange
+ * Core
  *###################################################################################################################################*/
-private class GroupArrangeImpl : LinkedHashMap<Any, Group>(), NemoRecyclerView.GroupArrange
+private sealed class Parts
 {
+	private data class Group(val tmp: Any) : Parts()
+	{
+		private data class Divider(val tmp: Any)
+	}
+	
+	private data class Space(val tmp: Any) : Parts()
+}
+
+private class Core : LinkedHashMap<Any, Parts>(), NemoRecyclerView.GroupArrange
+{
+	val adapter = Adapter()
+	
 	override fun bringForward(tag: Any)
 	{
 		TODO("not implemented")
@@ -167,6 +250,24 @@ private class GroupArrangeImpl : LinkedHashMap<Any, Group>(), NemoRecyclerView.G
 	override fun swap(tag1: Any, tag2: Any)
 	{
 		TODO("not implemented")
+	}
+	
+	private inner class Adapter : RecyclerView.Adapter<RecyclerView.ViewHolder>()
+	{
+		override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder
+		{
+			TODO("not implemented")
+		}
+		
+		override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int)
+		{
+			TODO("not implemented")
+		}
+		
+		override fun getItemCount(): Int
+		{
+			TODO("not implemented")
+		}
 	}
 }
 
@@ -287,29 +388,3 @@ private class MutableListImpl<M> : NemoRecyclerView.Model.MutableList<M>
 		TODO("not implemented")
 	}
 }
-
-/*###################################################################################################################################
- * Adapter
- *###################################################################################################################################*/
-private class AdapterImpl(val groups: GroupArrangeImpl) : RecyclerView.Adapter<RecyclerView.ViewHolder>()
-{
-	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder
-	{
-		TODO("not implemented")
-	}
-	
-	override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int)
-	{
-		TODO("not implemented")
-	}
-	
-	override fun getItemCount(): Int
-	{
-		TODO("not implemented")
-	}
-}
-
-/*###################################################################################################################################
- * Group
- *###################################################################################################################################*/
-private class Group
