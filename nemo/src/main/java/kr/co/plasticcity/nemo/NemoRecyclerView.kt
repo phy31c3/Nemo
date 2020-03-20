@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
+import kr.co.plasticcity.nemo.Parts.Group
 import kotlin.reflect.KClass
 
 class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : RecyclerView(context, attrs, defStyleAttr)
@@ -117,91 +118,84 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 		{
 			override var useSnap: Boolean
 				get() = TODO("not implemented")
-				set(value)
-				{
-				}
+				set(value) = TODO("not implemented")
 			
+			@Suppress("UNCHECKED_CAST")
 			override fun <M, V : ViewBinding> group(model: Model<M>, view: KClass<V>, tag: Any, block: GroupDefine<M, V>.() -> Unit) = object : GroupDefine<M, V>
 			{
+				var onBind: Bind.(data: M, binding: V) -> Unit = { _, _ -> }
+				var onPlaceHolder: Bind.(binding: V) -> Unit = {}
+				var numPlaceHolder = 0
+				
 				override var allowDragAndDrop: Boolean
 					get() = TODO("not implemented")
-					set(value)
-					{
-					}
+					set(value) = TODO("not implemented")
+				
 				override var allowSwipeToDismiss: Boolean
 					get() = TODO("not implemented")
-					set(value)
-					{
-					}
+					set(value) = TODO("not implemented")
 				
 				override fun bind(block: Bind.(data: M, binding: V) -> Unit)
 				{
-					TODO("not implemented")
+					onBind = block
 				}
 				
 				override fun placeHolder(num: Int, block: Bind.(binding: V) -> Unit)
 				{
-					TODO("not implemented")
+					numPlaceHolder = num
+					onPlaceHolder = block
 				}
 				
 				override fun divider(block: DividerDefine.() -> Unit) = object : DividerDefine
 				{
 					override var sizeDp: Int
 						get() = TODO("not implemented")
-						set(value)
-						{
-						}
+						set(value) = TODO("not implemented")
 					override var color: String
 						get() = TODO("not implemented")
-						set(value)
-						{
-						}
+						set(value) = TODO("not implemented")
 					override var colorRes: Int
 						get() = TODO("not implemented")
-						set(value)
-						{
-						}
+						set(value) = TODO("not implemented")
 					override var drawableRes: Int
 						get() = TODO("not implemented")
-						set(value)
-						{
-						}
+						set(value) = TODO("not implemented")
 					override var show: DividerDefine.Position.() -> Int
 						get() = TODO("not implemented")
-						set(value)
-						{
-						}
+						set(value) = TODO("not implemented")
 				}.block()
-			}.block()
+			}.run {
+				core.addParts(Group(
+						tag = tag,
+						model = model,
+						view = view,
+						onBind = onBind as Bind.(data: Any?, binding: ViewBinding) -> Unit,
+						onPlaceHolder = onPlaceHolder as Bind.(binding: ViewBinding) -> Unit,
+						numPlaceHolder = numPlaceHolder)
+				)
+				block()
+			}
 			
 			override fun space(block: SpaceDefine.() -> Unit) = object : SpaceDefine
 			{
 				override var sizeDp: Int
 					get() = TODO("not implemented")
-					set(value)
-					{
-					}
+					set(value) = TODO("not implemented")
 				override var color: String
 					get() = TODO("not implemented")
-					set(value)
-					{
-					}
+					set(value) = TODO("not implemented")
 				override var colorRes: Int
 					get() = TODO("not implemented")
-					set(value)
-					{
-					}
+					set(value) = TODO("not implemented")
 				override var fillViewport: Boolean
 					get() = TODO("not implemented")
-					set(value)
-					{
-					}
+					set(value) = TODO("not implemented")
 				override var fillWeight: Float
 					get() = TODO("not implemented")
-					set(value)
-					{
-					}
-			}.block()
+					set(value) = TODO("not implemented")
+			}.run {
+				block()
+			}
 		}.apply {
 			block()
 			this@NemoRecyclerView.layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
@@ -213,19 +207,24 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 /*###################################################################################################################################
  * Core
  *###################################################################################################################################*/
-private sealed class Parts
+private sealed class Parts(val tag: Any)
 {
-	private data class Group(val tmp: Any) : Parts()
-	{
-		private data class Divider(val tmp: Any)
-	}
+	class Group(tag: Any,
+	            val model: NemoRecyclerView.Model<*>, view: KClass<out ViewBinding>,
+	            val onBind: NemoRecyclerView.Bind.(data: Any?, binding: ViewBinding) -> Unit,
+	            val onPlaceHolder: NemoRecyclerView.Bind.(binding: ViewBinding) -> Unit,
+	            val numPlaceHolder: Int
+	) : Parts(tag)
 	
-	private data class Space(val tmp: Any) : Parts()
+	class Space(tag: Any) : Parts(tag)
 }
 
-private class Core : LinkedHashMap<Any, Parts>(), NemoRecyclerView.GroupArrange
+private class Core : NemoRecyclerView.GroupArrange
 {
 	val adapter = Adapter()
+	val map = LinkedHashMap<Any, Parts>()
+	
+	fun addParts(parts: Parts) = map.put(parts.tag, parts)
 	
 	override fun bringForward(tag: Any)
 	{
@@ -278,9 +277,7 @@ private class SingletonImpl<M> : NemoRecyclerView.Model.Singleton<M>
 {
 	override var value: M
 		get() = TODO("not implemented")
-		set(value)
-		{
-		}
+		set(value) = TODO("not implemented")
 }
 
 private class MutableListImpl<M> : NemoRecyclerView.Model.MutableList<M>
