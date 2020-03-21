@@ -22,7 +22,7 @@ class MainActivity : AppCompatActivity()
 			accounts.add("item3")
 			val groups = recyclerView(orientation = RecyclerView.VERTICAL, reverseLayout = false) {
 				useSnap = false
-				group(model = header, viewType = ActivityMainBinding::class, tag = "header") {
+				group(model = header, view = ActivityMainBinding::inflate, tag = "header") {
 					bind { data, binding ->
 						println(groupPos)
 						println(globalPos)
@@ -42,7 +42,7 @@ class MainActivity : AppCompatActivity()
 					fillViewport = true
 					fillWeight = 1f
 				}
-				group(model = accounts, viewType = ActivityMainBinding::class) {
+				group(model = accounts, view = ActivityMainBinding::inflate) {
 					allowDragAndDrop = false
 					allowSwipeToDismiss = false
 					bind { data, binding ->

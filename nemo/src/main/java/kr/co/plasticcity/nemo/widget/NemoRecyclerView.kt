@@ -2,12 +2,14 @@ package kr.co.plasticcity.nemo.widget
 
 import android.content.Context
 import android.util.AttributeSet
+import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import kr.co.plasticcity.nemo.widget.Parts.Group
-import kotlin.reflect.KClass
+
+private typealias ViewProvider = (LayoutInflater, ViewGroup, Boolean) -> ViewBinding
 
 class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : RecyclerView(context, attrs, defStyleAttr)
 {
@@ -19,8 +21,19 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	{
 		var useSnap: Boolean
 		
-		fun <M, V : ViewBinding> group(model: Model.Singleton<M>, viewType: KClass<V>, tag: Any = Any(), block: SingleGroupDefine<M, V>.() -> Unit) = group(model, viewType, tag, block as GroupDefine<M, V>.() -> Unit)
-		fun <M, V : ViewBinding> group(model: Model<M>, viewType: KClass<V>, tag: Any = Any(), block: GroupDefine<M, V>.() -> Unit)
+		fun <M, V : ViewBinding> group(
+				model: Model.Singleton<M>,
+				view: (LayoutInflater, ViewGroup, Boolean) -> V,
+				tag: Any = Any(),
+				block: SingleGroupDefine<M, V>.() -> Unit
+		) = group(model, view, tag, block as GroupDefine<M, V>.() -> Unit)
+		
+		fun <M, V : ViewBinding> group(
+				model: Model<M>,
+				view: (LayoutInflater, ViewGroup, Boolean) -> V,
+				tag: Any = Any(),
+				block: GroupDefine<M, V>.() -> Unit)
+		
 		fun space(block: SpaceDefine.() -> Unit)
 	}
 	
@@ -121,7 +134,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 				set(value) = TODO("not implemented")
 			
 			@Suppress("UNCHECKED_CAST")
-			override fun <M, V : ViewBinding> group(model: Model<M>, viewType: KClass<V>, tag: Any, block: GroupDefine<M, V>.() -> Unit) = object : GroupDefine<M, V>
+			override fun <M, V : ViewBinding> group(model: Model<M>, view: (LayoutInflater, ViewGroup, Boolean) -> V, tag: Any, block: GroupDefine<M, V>.() -> Unit) = object : GroupDefine<M, V>
 			{
 				var onBind: Bind.(data: M, binding: V) -> Unit = { _, _ -> }
 				var onPlaceHolder: Bind.(binding: V) -> Unit = {}
@@ -168,9 +181,9 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 				agent.addGroup(
 						tag = tag,
 						model = model,
-						viewType = viewType,
-						onBind = onBind as Bind.(data: Any?, binding: ViewBinding) -> Unit,
-						onPlaceHolder = onPlaceHolder as Bind.(binding: ViewBinding) -> Unit,
+						viewProvider = view,
+						onBind = onBind as Bind.(Any?, ViewBinding) -> Unit,
+						onPlaceHolder = onPlaceHolder as Bind.(ViewBinding) -> Unit,
 						numPlaceHolder = numPlaceHolder)
 				block()
 			}
@@ -210,7 +223,7 @@ private sealed class Parts(val tag: Any)
 {
 	class Group(tag: Any,
 	            val model: NemoRecyclerView.Model<*>,
-	            val viewType: KClass<out ViewBinding>,
+	            val viewProvider: ViewProvider,
 	            val onBind: NemoRecyclerView.Bind.(data: Any?, binding: ViewBinding) -> Unit,
 	            val onPlaceHolder: NemoRecyclerView.Bind.(binding: ViewBinding) -> Unit,
 	            val numPlaceHolder: Int
@@ -226,11 +239,11 @@ private class Agent : NemoRecyclerView.GroupArrange
 	
 	fun addGroup(tag: Any,
 	             model: NemoRecyclerView.Model<*>,
-	             viewType: KClass<out ViewBinding>,
+	             viewProvider: ViewProvider,
 	             onBind: NemoRecyclerView.Bind.(data: Any?, binding: ViewBinding) -> Unit,
 	             onPlaceHolder: NemoRecyclerView.Bind.(binding: ViewBinding) -> Unit,
 	             numPlaceHolder: Int
-	) = this.parts.put(tag, Group(tag, model, viewType, onBind, onPlaceHolder, numPlaceHolder))
+	) = this.parts.put(tag, Group(tag, model, viewProvider, onBind, onPlaceHolder, numPlaceHolder))
 	
 	override fun bringForward(tag: Any)
 	{
