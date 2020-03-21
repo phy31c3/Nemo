@@ -49,7 +49,7 @@ class MainActivity : AppCompatActivity()
 						println(groupPos)
 						println(globalPos)
 					}
-					placeHolder(num = 2) { binding ->
+					placeHolder { binding ->
 						println(groupPos)
 						println(globalPos)
 					}

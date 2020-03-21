@@ -48,7 +48,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 		var allowDragAndDrop: Boolean
 		var allowSwipeToDismiss: Boolean
 		
-		fun placeHolder(num: Int = 1, block: Bind.(binding: V) -> Unit)
+		fun placeHolder(block: Bind.(binding: V) -> Unit)
 	}
 	
 	@Marker
@@ -136,7 +136,6 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 			{
 				var onBind: Bind.(data: M, binding: V) -> Unit = { _, _ -> }
 				var onPlaceHolder: Bind.(binding: V) -> Unit = {}
-				var numPlaceHolder = 0
 				
 				override var allowDragAndDrop: Boolean
 					get() = TODO("not implemented")
@@ -151,9 +150,8 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 					onBind = block
 				}
 				
-				override fun placeHolder(num: Int, block: Bind.(binding: V) -> Unit)
+				override fun placeHolder(block: Bind.(binding: V) -> Unit)
 				{
-					numPlaceHolder = num
 					onPlaceHolder = block
 				}
 				
@@ -181,8 +179,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 						model = model as ModelInternal,
 						viewProvider = view,
 						onBind = onBind as Bind.(Any?, ViewBinding) -> Unit,
-						onPlaceHolder = onPlaceHolder as Bind.(ViewBinding) -> Unit,
-						numPlaceHolder = numPlaceHolder)
+						onPlaceHolder = onPlaceHolder as Bind.(ViewBinding) -> Unit)
 				block()
 			}
 			
@@ -225,8 +222,7 @@ private sealed class Parts(val tag: Any)
 	            val model: ModelInternal,
 	            val viewProvider: ViewProvider,
 	            val onBind: NemoRecyclerView.Bind.(data: Any?, binding: ViewBinding) -> Unit,
-	            val onPlaceHolder: NemoRecyclerView.Bind.(binding: ViewBinding) -> Unit,
-	            val numPlaceHolder: Int
+	            val onPlaceHolder: NemoRecyclerView.Bind.(binding: ViewBinding) -> Unit
 	) : Parts(tag)
 	
 	class Space(tag: Any) : Parts(tag)
@@ -241,9 +237,8 @@ private class Agent : NemoRecyclerView.GroupArrange
 	             model: ModelInternal,
 	             viewProvider: ViewProvider,
 	             onBind: NemoRecyclerView.Bind.(data: Any?, binding: ViewBinding) -> Unit,
-	             onPlaceHolder: NemoRecyclerView.Bind.(binding: ViewBinding) -> Unit,
-	             numPlaceHolder: Int
-	) = parts.put(tag, Group(tag, model, viewProvider, onBind, onPlaceHolder, numPlaceHolder))
+	             onPlaceHolder: NemoRecyclerView.Bind.(binding: ViewBinding) -> Unit
+	) = parts.put(tag, Group(tag, model, viewProvider, onBind, onPlaceHolder))
 	
 	override fun bringForward(tag: Any)
 	{
