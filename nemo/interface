@@ -6,10 +6,10 @@ val header = NemoRecyclerView.model(headerDTO)
 val accounts = NemoRecyclerView.model<AccountDTO>(accountDTOs) { acno + bkcd } // key: if not define then key is hashcode or null
 val groups = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout = false) {
     useSnap = false
-    group(model = header, view = HeaderItemBinding::inflate, tag = "header") {
+    group("header", model = header, view = HeaderItemBinding::inflate) {
         bind { data, binding ->
-            println(groupPos)
-            println(globalPos)
+			adapterPosition
+			modelPosition
         }
         divider {
             sizeDp = 3
@@ -26,16 +26,16 @@ val groups = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout
         fillViewport = true
         fillWeight = 1
     }
-    group(model = accounts, view = HeaderItemBinding::inflate, tag = "list") {
+    group("list", model = accounts, view = HeaderItemBinding::inflate) {
 		allowDragAndDrop = false
 		allowSwipeToDismiss = false
 		bind { data, binding ->
-			println(groupPos)
-			println(globalPos)
+			adapterPosition
+			modelPosition
 		}
 		placeHolder { binding ->
-			println(groupPos)
-			println(globalPos)
+			adapterPosition
+			modelPosition
 		}
     }
 }

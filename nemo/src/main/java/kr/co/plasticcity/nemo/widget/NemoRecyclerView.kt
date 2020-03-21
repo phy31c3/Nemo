@@ -54,8 +54,8 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	@Marker
 	interface Bind
 	{
-		val groupPos: Int
-		val globalPos: Int
+		val adapterPosition: Int
+		val modelPosition: Int
 	}
 	
 	@Marker

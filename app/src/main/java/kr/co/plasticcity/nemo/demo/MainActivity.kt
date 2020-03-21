@@ -24,8 +24,8 @@ class MainActivity : AppCompatActivity()
 				useSnap = false
 				group(model = header, view = ActivityMainBinding::inflate, tag = "header") {
 					bind { data, binding ->
-						println(groupPos)
-						println(globalPos)
+						println(adapterPosition)
+						println(modelPosition)
 					}
 					divider {
 						sizeDp = 3
@@ -46,12 +46,12 @@ class MainActivity : AppCompatActivity()
 					allowDragAndDrop = false
 					allowSwipeToDismiss = false
 					bind { data, binding ->
-						println(groupPos)
-						println(globalPos)
+						println(adapterPosition)
+						println(modelPosition)
 					}
 					placeHolder { binding ->
-						println(groupPos)
-						println(globalPos)
+						println(adapterPosition)
+						println(modelPosition)
 					}
 				}
 			}
