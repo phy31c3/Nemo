@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.android.synthetic.main.activity_main.*
-import kr.co.plasticcity.nemo.NemoRecyclerView
+import kr.co.plasticcity.nemo.widget.NemoRecyclerView
 import kr.co.plasticcity.nemo.demo.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity()
@@ -22,7 +22,7 @@ class MainActivity : AppCompatActivity()
 			accounts.add("item3")
 			val groups = recyclerView(orientation = RecyclerView.VERTICAL, reverseLayout = false) {
 				useSnap = false
-				group(model = header, view = ActivityMainBinding::class, tag = "header") {
+				group(model = header, viewType = ActivityMainBinding::class, tag = "header") {
 					bind { data, binding ->
 						println(groupPos)
 						println(globalPos)
@@ -42,7 +42,7 @@ class MainActivity : AppCompatActivity()
 					fillViewport = true
 					fillWeight = 1f
 				}
-				group(model = accounts, view = ActivityMainBinding::class) {
+				group(model = accounts, viewType = ActivityMainBinding::class) {
 					allowDragAndDrop = false
 					allowSwipeToDismiss = false
 					bind { data, binding ->
