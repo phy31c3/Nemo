@@ -9,8 +9,6 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import kr.co.plasticcity.nemo.widget.Parts.Group
 
-private typealias ViewProvider = (LayoutInflater, ViewGroup, Boolean) -> ViewBinding
-
 class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : RecyclerView(context, attrs, defStyleAttr)
 {
 	@DslMarker
@@ -180,7 +178,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 			}.run {
 				agent.addGroup(
 						tag = tag,
-						model = model,
+						model = model as ModelInternal,
 						viewProvider = view,
 						onBind = onBind as Bind.(Any?, ViewBinding) -> Unit,
 						onPlaceHolder = onPlaceHolder as Bind.(ViewBinding) -> Unit,
@@ -219,10 +217,12 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 /*###################################################################################################################################
  * Core
  *###################################################################################################################################*/
+private typealias ViewProvider = (LayoutInflater, ViewGroup, Boolean) -> ViewBinding
+
 private sealed class Parts(val tag: Any)
 {
 	class Group(tag: Any,
-	            val model: NemoRecyclerView.Model<*>,
+	            val model: ModelInternal,
 	            val viewProvider: ViewProvider,
 	            val onBind: NemoRecyclerView.Bind.(data: Any?, binding: ViewBinding) -> Unit,
 	            val onPlaceHolder: NemoRecyclerView.Bind.(binding: ViewBinding) -> Unit,
@@ -238,12 +238,12 @@ private class Agent : NemoRecyclerView.GroupArrange
 	val parts = LinkedHashMap<Any, Parts>()
 	
 	fun addGroup(tag: Any,
-	             model: NemoRecyclerView.Model<*>,
+	             model: ModelInternal,
 	             viewProvider: ViewProvider,
 	             onBind: NemoRecyclerView.Bind.(data: Any?, binding: ViewBinding) -> Unit,
 	             onPlaceHolder: NemoRecyclerView.Bind.(binding: ViewBinding) -> Unit,
 	             numPlaceHolder: Int
-	) = this.parts.put(tag, Group(tag, model, viewProvider, onBind, onPlaceHolder, numPlaceHolder))
+	) = parts.put(tag, Group(tag, model, viewProvider, onBind, onPlaceHolder, numPlaceHolder))
 	
 	override fun bringForward(tag: Any)
 	{
@@ -292,14 +292,16 @@ private class Agent : NemoRecyclerView.GroupArrange
 /*###################################################################################################################################
  * Model
  *###################################################################################################################################*/
-private class SingletonImpl<M> : NemoRecyclerView.Model.Singleton<M>
+private open class ModelInternal
+
+private class SingletonImpl<M> : ModelInternal(), NemoRecyclerView.Model.Singleton<M>
 {
 	override var value: M
 		get() = TODO("not implemented")
 		set(value) = TODO("not implemented")
 }
 
-private class MutableListImpl<M> : NemoRecyclerView.Model.MutableList<M>
+private class MutableListImpl<M> : ModelInternal(), NemoRecyclerView.Model.MutableList<M>
 {
 	override val size: Int
 		get() = TODO("not implemented")
