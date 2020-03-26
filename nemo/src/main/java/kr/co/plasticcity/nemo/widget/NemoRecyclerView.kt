@@ -5,12 +5,12 @@ package kr.co.plasticcity.nemo.widget
 import android.content.Context
 import android.util.AttributeSet
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import kr.co.plasticcity.nemo.widget.Parts.Group
+import kr.co.plasticcity.nemo.widget.Parts.Space
 import java.util.*
 import kotlin.collections.LinkedHashMap
 import kotlin.collections.LinkedHashSet
@@ -44,7 +44,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	@Marker
 	interface SingleGroupDefine<M, V : ViewBinding>
 	{
-		fun bind(block: NemoViewHolder.(data: M, binding: V) -> Unit)
+		fun bind(block: ViewHolder.(data: M, binding: V) -> Unit)
 		fun divider(block: DividerDefine.() -> Unit)
 	}
 	
@@ -54,11 +54,11 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 		var allowDragAndDrop: Boolean
 		var allowSwipeToDismiss: Boolean
 		
-		fun placeHolder(block: NemoViewHolder.(binding: V) -> Unit)
+		fun placeHolder(block: ViewHolder.(binding: V) -> Unit)
 	}
 	
 	@Marker
-	class NemoViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
+	class ViewHolder(internal val binding: ViewBinding) : RecyclerView.ViewHolder(binding.root)
 	{
 		var modelPosition: Int = 0
 			internal set
@@ -140,8 +140,8 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 			@Suppress("UNCHECKED_CAST")
 			override fun <M, V : ViewBinding> group(model: Model<M>, view: (LayoutInflater, ViewGroup, Boolean) -> V, tag: Any, block: GroupDefine<M, V>.() -> Unit) = object : GroupDefine<M, V>
 			{
-				var onBind: NemoViewHolder.(data: M, binding: V) -> Unit = { _, _ -> }
-				var onPlaceHolder: (NemoViewHolder.(binding: V) -> Unit)? = null
+				var onBind: ViewHolder.(data: M, binding: V) -> Unit = { _, _ -> }
+				var onPlaceHolder: (ViewHolder.(binding: V) -> Unit)? = null
 				
 				override var allowDragAndDrop: Boolean
 					get() = TODO("not implemented")
@@ -151,12 +151,12 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 					get() = TODO("not implemented")
 					set(value) = TODO("not implemented")
 				
-				override fun bind(block: NemoViewHolder.(data: M, binding: V) -> Unit)
+				override fun bind(block: ViewHolder.(data: M, binding: V) -> Unit)
 				{
 					onBind = block
 				}
 				
-				override fun placeHolder(block: NemoViewHolder.(binding: V) -> Unit)
+				override fun placeHolder(block: ViewHolder.(binding: V) -> Unit)
 				{
 					onPlaceHolder = block
 				}
@@ -184,8 +184,8 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 						tag = tag,
 						model = model as ModelInternal,
 						viewProvider = view,
-						onBind = onBind as NemoViewHolder.(Any?, ViewBinding) -> Unit,
-						onPlaceHolder = onPlaceHolder as (NemoViewHolder.(ViewBinding) -> Unit)?)
+						onBind = onBind as ViewHolder.(Any?, ViewBinding) -> Unit,
+						onPlaceHolder = onPlaceHolder as (ViewHolder.(ViewBinding) -> Unit)?)
 				block()
 			}
 			
@@ -226,11 +226,13 @@ private sealed class Parts(val tag: Any)
 {
 	abstract val size: Int
 	
+	var position = 0
+	
 	class Group(tag: Any,
 	            val model: ModelInternal,
 	            val viewProvider: ViewProvider,
-	            val onBind: NemoRecyclerView.NemoViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
-	            val onPlaceHolder: (NemoRecyclerView.NemoViewHolder.(binding: ViewBinding) -> Unit)? = null
+	            val onBind: NemoRecyclerView.ViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
+	            val onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)? = null
 	) : Parts(tag)
 	{
 		override val size: Int
@@ -256,13 +258,14 @@ private class Agent : NemoRecyclerView.GroupArrange
 	fun addGroup(tag: Any,
 	             model: ModelInternal,
 	             viewProvider: ViewProvider,
-	             onBind: NemoRecyclerView.NemoViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
-	             onPlaceHolder: (NemoRecyclerView.NemoViewHolder.(binding: ViewBinding) -> Unit)?)
+	             onBind: NemoRecyclerView.ViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
+	             onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)?)
 	{
 		val group = Group(tag, model, viewProvider, onBind, onPlaceHolder)
 		parts[tag] = group
 		tagViewType += tag
 		tagPosition[count] = tag
+		group.position = count
 		count += group.size
 	}
 	
@@ -270,19 +273,43 @@ private class Agent : NemoRecyclerView.GroupArrange
 	private fun tagOfPosition(position: Int) = tagPosition.floorEntry(position).value
 	private fun viewTypeOfTag(tag: Any) = tagViewType.indexOf(tag)
 	private fun viewTypeOfPosition(position: Int) = viewTypeOfTag(tagOfPosition(position))
-	private fun positionOfTag(tag: Any) = tagPosition[tag]
-	private fun positionOfViewType(viewType: Int) = positionOfTag(tagOfViewType(viewType))
 	
-	private inner class Adapter : RecyclerView.Adapter<NemoRecyclerView.NemoViewHolder>()
+	private inner class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>()
 	{
-		override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NemoRecyclerView.NemoViewHolder
+		override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NemoRecyclerView.ViewHolder
 		{
-			TODO("not implemented")
+			return parts[tagOfViewType(viewType)].let { parts ->
+				when (parts)
+				{
+					is Group -> parts.viewProvider(LayoutInflater.from(parent.context), parent, false)
+					is Space -> TODO("not implemented")
+					else -> TODO("null 처리")
+				}
+			}.let { binding ->
+				NemoRecyclerView.ViewHolder(binding)
+			}
 		}
 		
-		override fun onBindViewHolder(holder: NemoRecyclerView.NemoViewHolder, position: Int)
+		override fun onBindViewHolder(holder: NemoRecyclerView.ViewHolder, position: Int)
 		{
-			TODO("not implemented")
+			parts[tagOfPosition(position)].also { parts ->
+				when (parts)
+				{
+					is Group ->
+					{
+						if (parts.model.isNotEmpty)
+						{
+							holder.modelPosition = position - parts.position
+							parts.onBind(holder, parts.model[holder.modelPosition], holder.binding)
+						}
+						else if (parts.onPlaceHolder != null)
+						{
+							parts.onPlaceHolder.invoke(holder, holder.binding)
+						}
+					}
+					is Space -> TODO("not implemented")
+				}
+			}
 		}
 		
 		override fun getItemCount(): Int = count
@@ -321,6 +348,8 @@ private class Agent : NemoRecyclerView.GroupArrange
 private interface ModelInternal
 {
 	val size: Int
+	
+	operator fun get(index: Int): Any?
 }
 
 private val ModelInternal.isEmpty: Boolean
@@ -336,6 +365,8 @@ private class SingletonImpl<M>(value: M) : ModelInternal, NemoRecyclerView.Model
 	override var value: M
 		get() = TODO("not implemented")
 		set(value) = TODO("not implemented")
+	
+	override fun get(index: Int): Any? = value
 }
 
 private class MutableListImpl<M>(list: MutableList<M>) : ModelInternal, NemoRecyclerView.Model.MutableList<M>
