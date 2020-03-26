@@ -1,3 +1,5 @@
+@file:Suppress("NonAsciiCharacters", "PrivatePropertyName", "unused")
+
 package kr.co.plasticcity.nemo.widget
 
 import android.content.Context
@@ -9,6 +11,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import kr.co.plasticcity.nemo.widget.Parts.Group
+import java.util.*
+import kotlin.collections.LinkedHashMap
+import kotlin.collections.LinkedHashSet
 
 class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : RecyclerView(context, attrs, defStyleAttr)
 {
@@ -109,7 +114,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	
 	companion object
 	{
-		fun <M> model(model: M, key: (M.() -> Any?)? = null): Model.Singleton<M>
+		fun <M> model(value: M, key: (M.() -> Any?)? = null): Model.Singleton<M>
 		{
 			TODO()
 		}
@@ -136,7 +141,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 			override fun <M, V : ViewBinding> group(model: Model<M>, view: (LayoutInflater, ViewGroup, Boolean) -> V, tag: Any, block: GroupDefine<M, V>.() -> Unit) = object : GroupDefine<M, V>
 			{
 				var onBind: NemoViewHolder.(data: M, binding: V) -> Unit = { _, _ -> }
-				var onPlaceHolder: NemoViewHolder.(binding: V) -> Unit = {}
+				var onPlaceHolder: (NemoViewHolder.(binding: V) -> Unit)? = null
 				
 				override var allowDragAndDrop: Boolean
 					get() = TODO("not implemented")
@@ -180,7 +185,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 						model = model as ModelInternal,
 						viewProvider = view,
 						onBind = onBind as NemoViewHolder.(Any?, ViewBinding) -> Unit,
-						onPlaceHolder = onPlaceHolder as NemoViewHolder.(ViewBinding) -> Unit)
+						onPlaceHolder = onPlaceHolder as (NemoViewHolder.(ViewBinding) -> Unit)?)
 				block()
 			}
 			
@@ -219,27 +224,70 @@ private typealias ViewProvider = (LayoutInflater, ViewGroup, Boolean) -> ViewBin
 
 private sealed class Parts(val tag: Any)
 {
+	abstract val size: Int
+	
 	class Group(tag: Any,
 	            val model: ModelInternal,
 	            val viewProvider: ViewProvider,
 	            val onBind: NemoRecyclerView.NemoViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
-	            val onPlaceHolder: NemoRecyclerView.NemoViewHolder.(binding: ViewBinding) -> Unit
+	            val onPlaceHolder: (NemoRecyclerView.NemoViewHolder.(binding: ViewBinding) -> Unit)? = null
 	) : Parts(tag)
+	{
+		override val size: Int
+			get() = if (model.isNotEmpty) model.size else if (onPlaceHolder != null) 1 else 0
+	}
 	
 	class Space(tag: Any) : Parts(tag)
+	{
+		override val size: Int = 1
+	}
 }
 
 private class Agent : NemoRecyclerView.GroupArrange
 {
 	val adapter = Adapter()
-	val parts = LinkedHashMap<Any, Parts>()
+	
+	private val parts = LinkedHashMap<Any, Parts>()
+	private val tagViewType = LinkedHashSet<Any>()
+	private val tagPosition = TreeMap<Int, Any>()
+	
+	private var count = 0
 	
 	fun addGroup(tag: Any,
 	             model: ModelInternal,
 	             viewProvider: ViewProvider,
 	             onBind: NemoRecyclerView.NemoViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
-	             onPlaceHolder: NemoRecyclerView.NemoViewHolder.(binding: ViewBinding) -> Unit
-	) = parts.put(tag, Group(tag, model, viewProvider, onBind, onPlaceHolder))
+	             onPlaceHolder: (NemoRecyclerView.NemoViewHolder.(binding: ViewBinding) -> Unit)?)
+	{
+		val group = Group(tag, model, viewProvider, onBind, onPlaceHolder)
+		parts[tag] = group
+		tagViewType += tag
+		tagPosition[count] = tag
+		count += group.size
+	}
+	
+	private fun tagOfViewType(viewType: Int) = tagViewType.elementAt(viewType)
+	private fun tagOfPosition(position: Int) = tagPosition.floorEntry(position).value
+	private fun viewTypeOfTag(tag: Any) = tagViewType.indexOf(tag)
+	private fun viewTypeOfPosition(position: Int) = viewTypeOfTag(tagOfPosition(position))
+	private fun positionOfTag(tag: Any) = tagPosition[tag]
+	private fun positionOfViewType(viewType: Int) = positionOfTag(tagOfViewType(viewType))
+	
+	private inner class Adapter : RecyclerView.Adapter<NemoRecyclerView.NemoViewHolder>()
+	{
+		override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NemoRecyclerView.NemoViewHolder
+		{
+			TODO("not implemented")
+		}
+		
+		override fun onBindViewHolder(holder: NemoRecyclerView.NemoViewHolder, position: Int)
+		{
+			TODO("not implemented")
+		}
+		
+		override fun getItemCount(): Int = count
+		override fun getItemViewType(position: Int) = viewTypeOfPosition(position)
+	}
 	
 	override fun bringForward(tag: Any)
 	{
@@ -265,39 +313,32 @@ private class Agent : NemoRecyclerView.GroupArrange
 	{
 		TODO("not implemented")
 	}
-	
-	private inner class Adapter : RecyclerView.Adapter<NemoRecyclerView.NemoViewHolder>()
-	{
-		override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NemoRecyclerView.NemoViewHolder
-		{
-			TODO("not implemented")
-		}
-		
-		override fun onBindViewHolder(holder: NemoRecyclerView.NemoViewHolder, position: Int)
-		{
-			TODO("not implemented")
-		}
-		
-		override fun getItemCount(): Int
-		{
-			TODO("not implemented")
-		}
-	}
 }
 
 /*###################################################################################################################################
  * Model
  *###################################################################################################################################*/
-private open class ModelInternal
-
-private class SingletonImpl<M> : ModelInternal(), NemoRecyclerView.Model.Singleton<M>
+private interface ModelInternal
 {
+	val size: Int
+}
+
+private val ModelInternal.isEmpty: Boolean
+	get() = size == 0
+
+private val ModelInternal.isNotEmpty: Boolean
+	get() = size > 0
+
+private class SingletonImpl<M>(value: M) : ModelInternal, NemoRecyclerView.Model.Singleton<M>
+{
+	override val size: Int = 1
+	
 	override var value: M
 		get() = TODO("not implemented")
 		set(value) = TODO("not implemented")
 }
 
-private class MutableListImpl<M> : ModelInternal(), NemoRecyclerView.Model.MutableList<M>
+private class MutableListImpl<M>(list: MutableList<M>) : ModelInternal, NemoRecyclerView.Model.MutableList<M>
 {
 	override val size: Int
 		get() = TODO("not implemented")
