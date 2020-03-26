@@ -9,8 +9,8 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
-import kr.co.plasticcity.nemo.widget.Parts.Group
-import kr.co.plasticcity.nemo.widget.Parts.Space
+import kr.co.plasticcity.nemo.widget.Layer.Group
+import kr.co.plasticcity.nemo.widget.Layer.Space
 import java.util.*
 import kotlin.collections.LinkedHashMap
 import kotlin.collections.LinkedHashSet
@@ -110,6 +110,9 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 		
 		interface List<M> : Model<M>, kotlin.collections.List<M>
 		interface MutableList<M> : List<M>, kotlin.collections.MutableList<M>
+		{
+			fun replace(elements: Collection<M>)
+		}
 	}
 	
 	companion object
@@ -212,7 +215,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 		}.apply {
 			block()
 			this@NemoRecyclerView.layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
-			this@NemoRecyclerView.adapter = agent.adapter
+			this@NemoRecyclerView.adapter = agent
 		}
 	}
 }
@@ -222,36 +225,32 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
  *###################################################################################################################################*/
 private typealias ViewProvider = (LayoutInflater, ViewGroup, Boolean) -> ViewBinding
 
-private sealed class Parts(val tag: Any)
+private sealed class Layer(val tag: Any)
 {
 	abstract val size: Int
-	
-	var position = 0
 	
 	class Group(tag: Any,
 	            val model: ModelInternal,
 	            val viewProvider: ViewProvider,
 	            val onBind: NemoRecyclerView.ViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
 	            val onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)? = null
-	) : Parts(tag)
+	) : Layer(tag)
 	{
 		override val size: Int
 			get() = if (model.isNotEmpty) model.size else if (onPlaceHolder != null) 1 else 0
 	}
 	
-	class Space(tag: Any) : Parts(tag)
+	class Space(tag: Any) : Layer(tag)
 	{
 		override val size: Int = 1
 	}
 }
 
-private class Agent : NemoRecyclerView.GroupArrange
+private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoRecyclerView.GroupArrange
 {
-	val adapter = Adapter()
-	
-	private val parts = LinkedHashMap<Any, Parts>()
-	private val tagViewType = LinkedHashSet<Any>()
-	private val tagPosition = TreeMap<Int, Any>()
+	private val layers = LinkedHashMap<Any, Layer>()
+	private val layerViewType = LinkedHashSet<Layer>()
+	private val layerPosition = TreeMap<Int, Layer>()
 	
 	private var count = 0
 	
@@ -262,59 +261,56 @@ private class Agent : NemoRecyclerView.GroupArrange
 	             onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)?)
 	{
 		val group = Group(tag, model, viewProvider, onBind, onPlaceHolder)
-		parts[tag] = group
-		tagViewType += tag
-		tagPosition[count] = tag
-		group.position = count
+		layers[tag] = group
+		layerViewType += group
+		layerPosition[count] = group
+		group.model.agent = this
+		group.model.adapterPosition = count
 		count += group.size
 	}
 	
-	private fun tagOfViewType(viewType: Int) = tagViewType.elementAt(viewType)
-	private fun tagOfPosition(position: Int) = tagPosition.floorEntry(position).value
-	private fun viewTypeOfTag(tag: Any) = tagViewType.indexOf(tag)
-	private fun viewTypeOfPosition(position: Int) = viewTypeOfTag(tagOfPosition(position))
+	private fun layerOfViewType(viewType: Int) = layerViewType.elementAt(viewType)
+	private fun layerOfPosition(position: Int) = layerPosition.floorEntry(position).value
+	private fun viewTypeOfLayer(tag: Any) = layerViewType.indexOf(tag)
+	private fun viewTypeOfPosition(position: Int) = viewTypeOfLayer(layerOfPosition(position))
 	
-	private inner class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>()
+	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NemoRecyclerView.ViewHolder
 	{
-		override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NemoRecyclerView.ViewHolder
-		{
-			return parts[tagOfViewType(viewType)].let { parts ->
-				when (parts)
-				{
-					is Group -> parts.viewProvider(LayoutInflater.from(parent.context), parent, false)
-					is Space -> TODO("not implemented")
-					else -> TODO("null 처리")
-				}
-			}.let { binding ->
-				NemoRecyclerView.ViewHolder(binding)
+		return layerOfViewType(viewType).let { layer ->
+			when (layer)
+			{
+				is Group -> layer.viewProvider(LayoutInflater.from(parent.context), parent, false)
+				is Space -> TODO("not implemented")
 			}
+		}.let { binding ->
+			NemoRecyclerView.ViewHolder(binding)
 		}
-		
-		override fun onBindViewHolder(holder: NemoRecyclerView.ViewHolder, position: Int)
-		{
-			parts[tagOfPosition(position)].also { parts ->
-				when (parts)
-				{
-					is Group ->
-					{
-						if (parts.model.isNotEmpty)
-						{
-							holder.modelPosition = position - parts.position
-							parts.onBind(holder, parts.model[holder.modelPosition], holder.binding)
-						}
-						else if (parts.onPlaceHolder != null)
-						{
-							parts.onPlaceHolder.invoke(holder, holder.binding)
-						}
-					}
-					is Space -> TODO("not implemented")
-				}
-			}
-		}
-		
-		override fun getItemCount(): Int = count
-		override fun getItemViewType(position: Int) = viewTypeOfPosition(position)
 	}
+	
+	override fun onBindViewHolder(holder: NemoRecyclerView.ViewHolder, position: Int)
+	{
+		layerOfPosition(position).also { layer ->
+			when (layer)
+			{
+				is Group ->
+				{
+					if (layer.model.isNotEmpty)
+					{
+						holder.modelPosition = position - layer.model.adapterPosition
+						layer.onBind(holder, layer.model[holder.modelPosition], holder.binding)
+					}
+					else if (layer.onPlaceHolder != null)
+					{
+						layer.onPlaceHolder.invoke(holder, holder.binding)
+					}
+				}
+				is Space -> TODO("not implemented")
+			}
+		}
+	}
+	
+	override fun getItemCount(): Int = count
+	override fun getItemViewType(position: Int) = viewTypeOfPosition(position)
 	
 	override fun bringForward(tag: Any)
 	{
@@ -348,6 +344,8 @@ private class Agent : NemoRecyclerView.GroupArrange
 private interface ModelInternal
 {
 	val size: Int
+	var agent: Agent?
+	var adapterPosition: Int
 	
 	operator fun get(index: Int): Any?
 }
@@ -361,53 +359,22 @@ private val ModelInternal.isNotEmpty: Boolean
 private class SingletonImpl<M>(value: M) : ModelInternal, NemoRecyclerView.Model.Singleton<M>
 {
 	override val size: Int = 1
-	
-	override var value: M
-		get() = TODO("not implemented")
-		set(value) = TODO("not implemented")
+	override var agent: Agent? = null
+	override var adapterPosition: Int = 0
+	override var value: M = value
+		set(value)
+		{
+			field = value
+			agent?.notifyItemChanged(adapterPosition)
+		}
 	
 	override fun get(index: Int): Any? = value
 }
 
-private class MutableListImpl<M>(list: MutableList<M>) : ModelInternal, NemoRecyclerView.Model.MutableList<M>
+private class MutableListImpl<M>(private val list: MutableList<M>) : ModelInternal, NemoRecyclerView.Model.MutableList<M>, MutableList<M> by list
 {
-	override val size: Int
-		get() = TODO("not implemented")
-	
-	override fun contains(element: M): Boolean
-	{
-		TODO("not implemented")
-	}
-	
-	override fun containsAll(elements: Collection<M>): Boolean
-	{
-		TODO("not implemented")
-	}
-	
-	override fun get(index: Int): M
-	{
-		TODO("not implemented")
-	}
-	
-	override fun indexOf(element: M): Int
-	{
-		TODO("not implemented")
-	}
-	
-	override fun isEmpty(): Boolean
-	{
-		TODO("not implemented")
-	}
-	
-	override fun iterator(): MutableIterator<M>
-	{
-		TODO("not implemented")
-	}
-	
-	override fun lastIndexOf(element: M): Int
-	{
-		TODO("not implemented")
-	}
+	override var agent: Agent? = null
+	override var adapterPosition: Int = 0
 	
 	override fun add(element: M): Boolean
 	{
@@ -434,16 +401,6 @@ private class MutableListImpl<M>(list: MutableList<M>) : ModelInternal, NemoRecy
 		TODO("not implemented")
 	}
 	
-	override fun listIterator(): MutableListIterator<M>
-	{
-		TODO("not implemented")
-	}
-	
-	override fun listIterator(index: Int): MutableListIterator<M>
-	{
-		TODO("not implemented")
-	}
-	
 	override fun remove(element: M): Boolean
 	{
 		TODO("not implemented")
@@ -459,17 +416,17 @@ private class MutableListImpl<M>(list: MutableList<M>) : ModelInternal, NemoRecy
 		TODO("not implemented")
 	}
 	
+	override fun replace(elements: Collection<M>)
+	{
+		TODO("not implemented")
+	}
+	
 	override fun retainAll(elements: Collection<M>): Boolean
 	{
 		TODO("not implemented")
 	}
 	
 	override fun set(index: Int, element: M): M
-	{
-		TODO("not implemented")
-	}
-	
-	override fun subList(fromIndex: Int, toIndex: Int): MutableList<M>
 	{
 		TODO("not implemented")
 	}
