@@ -10,6 +10,7 @@ import androidx.collection.ArraySet
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
+import kr.co.plasticcity.nemo.alsoIf
 import kr.co.plasticcity.nemo.widget.Layer.Group
 import kr.co.plasticcity.nemo.widget.Layer.Space
 import java.util.*
@@ -411,37 +412,78 @@ private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?
 	
 	override fun add(element: M): Boolean
 	{
-		TODO("not implemented")
+		val index = size
+		list.add(element)
+		agent?.notifyItemInserted(adapterPosition + index)
+		return true
 	}
 	
 	override fun add(index: Int, element: M)
 	{
-		TODO("not implemented")
+		list.add(index, element)
+		agent?.notifyItemInserted(adapterPosition + index)
 	}
 	
 	override fun addAll(index: Int, elements: Collection<M>): Boolean
 	{
-		TODO("not implemented")
+		return list.addAll(index, elements).alsoIf(true) {
+			agent?.notifyItemRangeInserted(adapterPosition + index, elements.size)
+		}
 	}
 	
 	override fun addAll(elements: Collection<M>): Boolean
 	{
-		TODO("not implemented")
+		val index = size
+		return list.addAll(elements).alsoIf(true) {
+			agent?.notifyItemRangeInserted(adapterPosition + index, elements.size)
+		}
 	}
 	
 	override fun clear()
 	{
-		TODO("not implemented")
+		val count = size
+		list.clear()
+		agent?.notifyItemRangeRemoved(adapterPosition, count)
 	}
 	
 	override fun remove(element: M): Boolean
 	{
-		TODO("not implemented")
+		val index = list.indexOf(element)
+		return list.remove(element).alsoIf(true) {
+			agent?.notifyItemRemoved(adapterPosition + index)
+		}
 	}
 	
 	override fun removeAll(elements: Collection<M>): Boolean
 	{
-		TODO("not implemented")
+		val ranges = mutableListOf<Range>()
+		var current = Range(-1)
+		var removed = 0
+		list.forEachIndexed { index, m ->
+			if (elements.contains(m))
+			{
+				when
+				{
+					current.index == -1 ->
+					{
+						current = Range(index)
+						ranges += current
+					}
+					current.next == index -> ++current
+					else ->
+					{
+						removed += current.count
+						current = Range(index, -removed)
+						ranges += current
+					}
+				}
+			}
+		}
+		return list.removeAll(elements).alsoIf(true) {
+			ranges.forEach { range ->
+				agent?.notifyItemRangeRemoved(range.position, range.count)
+			}
+		}
 	}
 	
 	override fun removeAt(index: Int): M
@@ -462,5 +504,23 @@ private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?
 	override fun set(index: Int, element: M): M
 	{
 		TODO("not implemented")
+	}
+	
+	private inner class Range(val index: Int, val padding: Int = 0)
+	{
+		val position: Int
+			get() = adapterPosition + index + padding
+		
+		val next: Int
+			get() = index + count
+		
+		var count = 1
+			private set
+		
+		operator fun inc(): Range
+		{
+			++count
+			return this
+		}
 	}
 }
