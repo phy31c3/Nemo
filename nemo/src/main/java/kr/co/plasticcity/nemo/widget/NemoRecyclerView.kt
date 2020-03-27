@@ -6,6 +6,7 @@ import android.content.Context
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.collection.ArraySet
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
@@ -13,7 +14,6 @@ import kr.co.plasticcity.nemo.widget.Layer.Group
 import kr.co.plasticcity.nemo.widget.Layer.Space
 import java.util.*
 import kotlin.collections.LinkedHashMap
-import kotlin.collections.LinkedHashSet
 
 class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : RecyclerView(context, attrs, defStyleAttr)
 {
@@ -249,10 +249,16 @@ private sealed class Layer(val tag: Any)
 private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoRecyclerView.GroupArrange
 {
 	private val layers = LinkedHashMap<Any, Layer>()
-	private val layerViewType = LinkedHashSet<Layer>()
+	private val layerViewType = ArraySet<Layer>()
 	private val layerPosition = TreeMap<Int, Layer>()
+	private val itemIds = ArraySet<Any>()
 	
 	private var count = 0
+	
+	init
+	{
+		setHasStableIds(true)
+	}
 	
 	fun addGroup(tag: Any,
 	             model: ModelInternal,
@@ -270,9 +276,9 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 	}
 	
 	private fun layerOfViewType(viewType: Int) = layerViewType.elementAt(viewType)
-	private fun layerOfPosition(position: Int) = layerPosition.floorEntry(position).value
-	private fun viewTypeOfLayer(tag: Any) = layerViewType.indexOf(tag)
-	private fun viewTypeOfPosition(position: Int) = viewTypeOfLayer(layerOfPosition(position))
+	private fun layerAtPosition(position: Int) = layerPosition.floorEntry(position).value
+	private fun viewTypeOfLayer(layer: Layer) = layerViewType.indexOf(layer)
+	private fun viewTypeAtPosition(position: Int) = viewTypeOfLayer(layerAtPosition(position))
 	
 	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NemoRecyclerView.ViewHolder
 	{
@@ -289,7 +295,7 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 	
 	override fun onBindViewHolder(holder: NemoRecyclerView.ViewHolder, position: Int)
 	{
-		layerOfPosition(position).also { layer ->
+		layerAtPosition(position).also { layer ->
 			when (layer)
 			{
 				is Group ->
@@ -310,7 +316,30 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 	}
 	
 	override fun getItemCount(): Int = count
-	override fun getItemViewType(position: Int) = viewTypeOfPosition(position)
+	override fun getItemViewType(position: Int) = viewTypeAtPosition(position)
+	override fun getItemId(position: Int): Long
+	{
+		return layerAtPosition(position).let { layer ->
+			when (layer)
+			{
+				is Group ->
+				{
+					val modelPosition = position - layer.model.adapterPosition
+					layer.model.keyAt(modelPosition)
+				}
+				is Space ->
+				{
+					layer.tag
+				}
+			}?.let { key ->
+				if (!itemIds.contains(key))
+				{
+					itemIds += key
+				}
+				(viewTypeOfLayer(layer).toLong() shl Int.SIZE_BITS) or itemIds.indexOf(key).toLong()
+			}
+		} ?: RecyclerView.NO_ID
+	}
 	
 	override fun bringForward(tag: Any)
 	{
@@ -348,6 +377,7 @@ private interface ModelInternal
 	var adapterPosition: Int
 	
 	operator fun get(index: Int): Any?
+	fun keyAt(index: Int): Any?
 }
 
 private val ModelInternal.isEmpty: Boolean
@@ -356,7 +386,7 @@ private val ModelInternal.isEmpty: Boolean
 private val ModelInternal.isNotEmpty: Boolean
 	get() = size > 0
 
-private class SingletonImpl<M>(value: M) : ModelInternal, NemoRecyclerView.Model.Singleton<M>
+private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.Singleton<M>
 {
 	override val size: Int = 1
 	override var agent: Agent? = null
@@ -369,12 +399,15 @@ private class SingletonImpl<M>(value: M) : ModelInternal, NemoRecyclerView.Model
 		}
 	
 	override fun get(index: Int): Any? = value
+	override fun keyAt(index: Int): Any? = value.key()
 }
 
-private class MutableListImpl<M>(private val list: MutableList<M>) : ModelInternal, NemoRecyclerView.Model.MutableList<M>, MutableList<M> by list
+private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.MutableList<M>, MutableList<M> by list
 {
 	override var agent: Agent? = null
 	override var adapterPosition: Int = 0
+	
+	override fun keyAt(index: Int): Any? = this[index].key()
 	
 	override fun add(element: M): Boolean
 	{
