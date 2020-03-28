@@ -395,8 +395,11 @@ private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelI
 	override var value: M = value
 		set(value)
 		{
-			field = value
-			agent?.notifyItemChanged(adapterPosition)
+			if (field != value)
+			{
+				field = value
+				agent?.notifyItemChanged(adapterPosition)
+			}
 		}
 	
 	override fun get(index: Int): Any? = value
@@ -413,9 +416,9 @@ private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?
 	override fun add(element: M): Boolean
 	{
 		val index = size
-		list.add(element)
-		agent?.notifyItemInserted(adapterPosition + index)
-		return true
+		return list.add(element).alsoIf(true) {
+			agent?.notifyItemInserted(adapterPosition + index)
+		}
 	}
 	
 	override fun add(index: Int, element: M)
@@ -488,7 +491,9 @@ private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?
 	
 	override fun removeAt(index: Int): M
 	{
-		TODO("not implemented")
+		return list.removeAt(index).also {
+			agent?.notifyItemRemoved(adapterPosition + index)
+		}
 	}
 	
 	override fun replace(elements: Collection<M>)
@@ -498,12 +503,44 @@ private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?
 	
 	override fun retainAll(elements: Collection<M>): Boolean
 	{
-		TODO("not implemented")
+		val ranges = mutableListOf<Range>()
+		var current = Range(-1)
+		var removed = 0
+		list.forEachIndexed { index, m ->
+			if (!elements.contains(m))
+			{
+				when
+				{
+					current.index == -1 ->
+					{
+						current = Range(index)
+						ranges += current
+					}
+					current.next == index -> ++current
+					else ->
+					{
+						removed += current.count
+						current = Range(index, -removed)
+						ranges += current
+					}
+				}
+			}
+		}
+		return list.retainAll(elements).alsoIf(true) {
+			ranges.forEach { range ->
+				agent?.notifyItemRangeRemoved(range.position, range.count)
+			}
+		}
 	}
 	
 	override fun set(index: Int, element: M): M
 	{
-		TODO("not implemented")
+		return list.set(index, element).also { prevElement ->
+			if (prevElement != element)
+			{
+				agent?.notifyItemChanged(adapterPosition + index)
+			}
+		}
 	}
 	
 	private inner class Range(val index: Int, val padding: Int = 0)
