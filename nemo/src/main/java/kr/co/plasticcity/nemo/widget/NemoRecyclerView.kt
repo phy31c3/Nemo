@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import kr.co.plasticcity.nemo.alsoIf
+import kr.co.plasticcity.nemo.removeRange
 import kr.co.plasticcity.nemo.widget.Layer.Group
 import kr.co.plasticcity.nemo.widget.Layer.Space
 import java.util.*
@@ -112,7 +113,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 		interface List<M> : Model<M>, kotlin.collections.List<M>
 		interface MutableList<M> : List<M>, kotlin.collections.MutableList<M>
 		{
-			fun replace(elements: Collection<M>)
+			fun update(elements: Collection<M>)
 		}
 	}
 	
@@ -496,11 +497,6 @@ private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?
 		}
 	}
 	
-	override fun replace(elements: Collection<M>)
-	{
-		TODO("not implemented")
-	}
-	
 	override fun retainAll(elements: Collection<M>): Boolean
 	{
 		val ranges = mutableListOf<Range>()
@@ -540,6 +536,104 @@ private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?
 			{
 				agent?.notifyItemChanged(adapterPosition + index)
 			}
+		}
+	}
+	
+	override fun update(elements: Collection<M>)
+	{
+		fun List<M>.findSameKey(from: Int, key: Any?): Int
+		{
+			if (from > lastIndex) return -1
+			
+			for (i in from..lastIndex)
+			{
+				if (this[i].key() == key)
+				{
+					return i
+				}
+			}
+			
+			return -1
+		}
+		
+		fun MutableList<Range>.submit()
+		{
+			if (isNotEmpty())
+			{
+				forEach { range ->
+					agent?.notifyItemRangeChanged(range.position, range.count)
+				}
+			}
+			clear()
+		}
+		
+		fun MutableList<Range>.update(lIndex: Int, rElement: M)
+		{
+			val lElement = list[lIndex]
+			if (lElement != rElement)
+			{
+				list[lIndex] = rElement
+				if (isEmpty() || last().next != lIndex)
+				{
+					this += Range(lIndex)
+				}
+				else
+				{
+					last().inc()
+				}
+			}
+		}
+		
+		var lIndex = 0
+		val change = mutableListOf<Range>()
+		val insert = mutableListOf<M>()
+		elements.forEach { rElement ->
+			var lMark = list.findSameKey(lIndex, rElement.key())
+			when (lMark)
+			{
+				-1 /* no same key */ ->
+				{
+					change.submit()
+					insert += rElement
+				}
+				lIndex /* same with current index */ ->
+				{
+					if (insert.isNotEmpty())
+					{
+						addAll(lIndex, insert)
+						lIndex += insert.size
+						insert.clear()
+					}
+					change.update(lIndex, rElement)
+					++lIndex
+				}
+				else /* lMark > lIndex */ ->
+				{
+					change.submit()
+					if (insert.isNotEmpty())
+					{
+						addAll(lIndex, insert)
+						lIndex += insert.size
+						lMark += insert.size
+						insert.clear()
+					}
+					list.removeRange(lIndex, lMark)
+					agent?.notifyItemRangeRemoved(adapterPosition + lIndex, lMark - lIndex)
+					change.update(lIndex, rElement)
+					++lIndex
+				}
+			}
+		}
+		if (lIndex < list.size)
+		{
+			val count = list.size - lIndex
+			list.removeRange(lIndex, list.size)
+			agent?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
+		}
+		change.submit()
+		if (insert.isNotEmpty())
+		{
+			addAll(lIndex, insert)
 		}
 	}
 	
