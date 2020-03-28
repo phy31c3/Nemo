@@ -624,16 +624,17 @@ private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?
 				}
 			}
 		}
+		change.submit()
+		if (insert.isNotEmpty())
+		{
+			addAll(lIndex, insert)
+			lIndex += insert.size
+		}
 		if (lIndex < list.size)
 		{
 			val count = list.size - lIndex
 			list.removeRange(lIndex, list.size)
 			agent?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
-		}
-		change.submit()
-		if (insert.isNotEmpty())
-		{
-			addAll(lIndex, insert)
 		}
 	}
 	
