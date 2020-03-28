@@ -319,29 +319,26 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 	
 	override fun getItemCount(): Int = count
 	override fun getItemViewType(position: Int) = viewTypeAtPosition(position)
-	override fun getItemId(position: Int): Long
-	{
-		return layerAtPosition(position).let { layer ->
-			when (layer)
+	override fun getItemId(position: Int): Long = layerAtPosition(position).let { layer ->
+		when (layer)
+		{
+			is Group ->
 			{
-				is Group ->
-				{
-					val modelPosition = position - layer.model.adapterPosition
-					layer.model.keyAt(modelPosition)
-				}
-				is Space ->
-				{
-					layer.tag
-				}
-			}?.let { key ->
-				if (!itemIds.contains(key))
-				{
-					itemIds += key
-				}
-				(viewTypeOfLayer(layer).toLong() shl Int.SIZE_BITS) or itemIds.indexOf(key).toLong()
+				val modelPosition = position - layer.model.adapterPosition
+				layer.model.keyAt(modelPosition)
 			}
-		} ?: RecyclerView.NO_ID
-	}
+			is Space ->
+			{
+				layer.tag
+			}
+		}?.let { key ->
+			if (!itemIds.contains(key))
+			{
+				itemIds += key
+			}
+			(viewTypeOfLayer(layer).toLong() shl Int.SIZE_BITS) or itemIds.indexOf(key).toLong()
+		}
+	} ?: RecyclerView.NO_ID
 	
 	override fun bringForward(tag: Any)
 	{
