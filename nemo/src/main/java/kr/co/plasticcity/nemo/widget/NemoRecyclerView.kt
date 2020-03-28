@@ -119,20 +119,9 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 	
 	companion object
 	{
-		fun <M> model(value: M, key: (M.() -> Any?)? = null): Model.Singleton<M>
-		{
-			TODO()
-		}
-		
-		fun <M> model(list: List<M>, key: (M.() -> Any?)? = null): Model.List<M>
-		{
-			TODO()
-		}
-		
-		fun <M> model(list: MutableList<M>, key: (M.() -> Any?)? = null): Model.MutableList<M>
-		{
-			TODO()
-		}
+		fun <M> model(value: M, key: M.() -> Any? = { null }): Model.Singleton<M> = SingletonImpl(value, key)
+		fun <M> model(list: List<M>, key: M.() -> Any? = { null }): Model.List<M> = ListImpl(list, key)
+		fun <M> model(list: MutableList<M>, key: M.() -> Any? = { null }): Model.MutableList<M> = MutableListImpl(list, key)
 	}
 	
 	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL, reverseLayout: Boolean = false, block: Define.() -> Unit): GroupArrange = Agent().also { agent ->
@@ -402,6 +391,14 @@ private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelI
 	
 	override fun get(index: Int): Any? = value
 	override fun keyAt(index: Int): Any? = value.key()
+}
+
+private class ListImpl<M>(val list: List<M>, val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.List<M>, List<M> by list
+{
+	override var agent: Agent? = null
+	override var adapterPosition: Int = 0
+	
+	override fun keyAt(index: Int): Any? = this[index].key()
 }
 
 private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.MutableList<M>, MutableList<M> by list
