@@ -53,11 +53,11 @@ class MainActivity : AppCompatActivity()
 						binding.text.text = data.text
 						binding.genButton.setOnClickListener {
 							val newList = mutableListOf<Item>()
-							for (i in 0..19)
+							for (i in 0..4000)
 							{
 								if (Math.random() < 0.5)
 								{
-									newList.add(Item(i))
+									newList.add(Item(i, (Math.random() * 20).toInt()))
 								}
 							}
 							list.update(newList)
@@ -73,7 +73,7 @@ class MainActivity : AppCompatActivity()
 				}
 				group(list, ItemListBinding::inflate) {
 					bind { data, binding ->
-						binding.root.setBackgroundColor(Color.parseColor(colors[data.key]))
+						binding.root.setBackgroundColor(Color.parseColor(colors[data.color]))
 						binding.text.text = "${data.key}"
 					}
 					placeholder(ItemListPlaceholderBinding::inflate)
@@ -88,4 +88,4 @@ class MainActivity : AppCompatActivity()
 
 private data class Header(val title: String, val content: String)
 private data class ItemHeader(val text: String)
-private data class Item(val key: Int)
+private data class Item(val key: Int, val color: Int)
