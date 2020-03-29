@@ -53,7 +53,7 @@ class MainActivity : AppCompatActivity()
 						binding.text.text = data.text
 						binding.genButton.setOnClickListener {
 							val newList = mutableListOf<Item>()
-							for (i in 0..4000)
+							for (i in 0..1000)
 							{
 								if (Math.random() < 0.5)
 								{
