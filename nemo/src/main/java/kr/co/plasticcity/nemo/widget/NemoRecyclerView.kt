@@ -15,7 +15,6 @@ import kr.co.plasticcity.nemo.removeRange
 import kr.co.plasticcity.nemo.widget.Layer.Group
 import kr.co.plasticcity.nemo.widget.Layer.Space
 import java.util.*
-import kotlin.collections.LinkedHashMap
 
 class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : RecyclerView(context, attrs, defStyleAttr)
 {
@@ -244,10 +243,20 @@ private sealed class Layer(val tag: Any)
 
 private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoRecyclerView.GroupArrange
 {
-	private val layers = LinkedHashMap<Any, Layer>()
+	companion object
+	{
+		var itemIdPool = 0
+	}
+	
+	private val layers = mutableMapOf<Any, Layer>()
+	
+	/* for layer order */
+	private val layerOrder = LinkedList<Layer>()
 	private val layerPosition = TreeMap<Int, Layer>()
-	private val viewTypePool = ArraySet<Layer>()
-	private val idPool = ArraySet<Any>()
+	
+	/* for immutable view type or item id */
+	private val layerArrayForViewType = ArraySet<Layer>()
+	private val keyMapForItemId = mutableMapOf<Any, Int>()
 	
 	private var count = 0
 	
@@ -259,15 +268,16 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 	fun add(group: Group)
 	{
 		layers[group.tag] = group
+		layerOrder += group
 		layerPosition[count] = group
-		viewTypePool += group
+		layerArrayForViewType += group
 		group.model.agent = this
 		group.model.adapterPosition = count
 		count += group.size
 	}
 	
 	private fun layerAtPosition(position: Int) = layerPosition.floorEntry(position).value
-	private fun layerOfViewType(viewType: Int) = viewTypePool.elementAt(viewType.toNormalViewType())
+	private fun layerOfViewType(viewType: Int) = layerArrayForViewType.elementAt(viewType.toNormalViewType())
 	
 	private fun Int.toNormalViewType(): Int = this and -0x40000001
 	private fun Int.toPlaceholderViewType(): Int = this or 0x40000000
@@ -332,10 +342,10 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 		{
 			is Group ->
 			{
-				if (layer.model.isNotEmpty) viewTypePool.indexOf(layer)
-				else /* placeholder */ viewTypePool.indexOf(layer).toPlaceholderViewType()
+				if (layer.model.isNotEmpty) layerArrayForViewType.indexOf(layer)
+				else /* placeholder */ layerArrayForViewType.indexOf(layer).toPlaceholderViewType()
 			}
-			is Space -> viewTypePool.indexOf(layer)
+			is Space -> layerArrayForViewType.indexOf(layer)
 		}
 	}
 	
@@ -348,22 +358,25 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 				if (layer.model.isNotEmpty)
 				{
 					val modelPosition = position - layer.model.adapterPosition
-					Pair(layer.model.keyAt(modelPosition), viewTypePool.indexOf(layer))
+					Pair(layer.model.keyAt(modelPosition), layerArrayForViewType.indexOf(layer))
 				}
 				else /* placeholder */
 				{
-					Pair("placeholder", viewTypePool.indexOf(layer).toPlaceholderViewType())
+					Pair("placeholder", layerArrayForViewType.indexOf(layer).toPlaceholderViewType())
 				}
 			}
 			is Space ->
 			{
-				Pair("space", viewTypePool.indexOf(layer))
+				Pair("space", layerArrayForViewType.indexOf(layer))
 			}
 		}.let { (key, viewType) ->
 			if (key != null)
 			{
-				if (!idPool.contains(key)) idPool += key
-				(viewType.toLong() shl Int.SIZE_BITS) or idPool.indexOf(key).toLong()
+				(keyMapForItemId[key] ?: itemIdPool++.also { itemId ->
+					keyMapForItemId[key] = itemId
+				}).let { itemId ->
+					(viewType.toLong() shl Int.SIZE_BITS) or itemId.toLong()
+				}
 			}
 			else
 			{
