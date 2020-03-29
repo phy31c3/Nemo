@@ -33,7 +33,7 @@ val groups = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout
 			adapterPosition
 			modelPosition
 		}
-		placeHolder { binding ->
+		placeholder(view = PlaceHolderBinding::inflate) { binding ->
 			adapterPosition
 			modelPosition
 		}

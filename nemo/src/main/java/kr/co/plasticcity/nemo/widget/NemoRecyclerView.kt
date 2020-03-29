@@ -56,7 +56,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 		var allowDragAndDrop: Boolean
 		var allowSwipeToDismiss: Boolean
 		
-		fun placeHolder(block: ViewHolder.(binding: V) -> Unit)
+		fun <PH : ViewBinding> placeholder(view: (LayoutInflater, ViewGroup, Boolean) -> PH, block: (ViewHolder.(binding: PH) -> Unit)? = null)
 	}
 	
 	@Marker
@@ -134,8 +134,9 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 			@Suppress("UNCHECKED_CAST")
 			override fun <M, V : ViewBinding> group(model: Model<M>, view: (LayoutInflater, ViewGroup, Boolean) -> V, tag: Any, block: GroupDefine<M, V>.() -> Unit) = object : GroupDefine<M, V>
 			{
-				var onBind: ViewHolder.(data: M, binding: V) -> Unit = { _, _ -> }
-				var onPlaceHolder: (ViewHolder.(binding: V) -> Unit)? = null
+				var onBind: ViewHolder.(Any?, ViewBinding) -> Unit = { _, _ -> }
+				var placeholderProvider: ViewProvider? = null
+				var onPlaceHolder: (ViewHolder.(ViewBinding) -> Unit)? = null
 				
 				override var allowDragAndDrop: Boolean
 					get() = TODO("not implemented")
@@ -147,12 +148,13 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 				
 				override fun bind(block: ViewHolder.(data: M, binding: V) -> Unit)
 				{
-					onBind = block
+					onBind = block as ViewHolder.(Any?, ViewBinding) -> Unit
 				}
 				
-				override fun placeHolder(block: ViewHolder.(binding: V) -> Unit)
+				override fun <PH : ViewBinding> placeholder(view: (LayoutInflater, ViewGroup, Boolean) -> PH, block: (ViewHolder.(binding: PH) -> Unit)?)
 				{
-					onPlaceHolder = block
+					placeholderProvider = view
+					onPlaceHolder = block as? ViewHolder.(ViewBinding) -> Unit
 				}
 				
 				override fun divider(block: DividerDefine.() -> Unit) = object : DividerDefine
@@ -174,12 +176,14 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 						set(value) = TODO("not implemented")
 				}.block()
 			}.run {
-				agent.addGroup(
+				agent.add(Group(
 						tag = tag,
 						model = model as ModelInternal,
 						viewProvider = view,
-						onBind = onBind as ViewHolder.(Any?, ViewBinding) -> Unit,
-						onPlaceHolder = onPlaceHolder as (ViewHolder.(ViewBinding) -> Unit)?)
+						onBind = onBind,
+						placeholderProvider = placeholderProvider,
+						onPlaceHolder = onPlaceHolder)
+				)
 				block()
 			}
 			
@@ -224,11 +228,12 @@ private sealed class Layer(val tag: Any)
 	            val model: ModelInternal,
 	            val viewProvider: ViewProvider,
 	            val onBind: NemoRecyclerView.ViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
-	            val onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)? = null
+	            val placeholderProvider: ViewProvider?,
+	            val onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)?
 	) : Layer(tag)
 	{
 		override val size: Int
-			get() = if (model.isNotEmpty) model.size else if (onPlaceHolder != null) 1 else 0
+			get() = if (model.isNotEmpty) model.size else if (placeholderProvider != null) 1 else 0
 	}
 	
 	class Space(tag: Any) : Layer(tag)
@@ -240,9 +245,9 @@ private sealed class Layer(val tag: Any)
 private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoRecyclerView.GroupArrange
 {
 	private val layers = LinkedHashMap<Any, Layer>()
-	private val layerViewType = ArraySet<Layer>()
 	private val layerPosition = TreeMap<Int, Layer>()
-	private val itemIds = ArraySet<Any>()
+	private val viewTypePool = ArraySet<Layer>()
+	private val idPool = ArraySet<Any>()
 	
 	private var count = 0
 	
@@ -251,32 +256,47 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 		setHasStableIds(true)
 	}
 	
-	fun addGroup(tag: Any,
-	             model: ModelInternal,
-	             viewProvider: ViewProvider,
-	             onBind: NemoRecyclerView.ViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
-	             onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)?)
+	fun add(group: Group)
 	{
-		val group = Group(tag, model, viewProvider, onBind, onPlaceHolder)
-		layers[tag] = group
-		layerViewType += group
+		layers[group.tag] = group
 		layerPosition[count] = group
+		viewTypePool += group
 		group.model.agent = this
 		group.model.adapterPosition = count
 		count += group.size
 	}
 	
-	private fun layerOfViewType(viewType: Int) = layerViewType.elementAt(viewType)
 	private fun layerAtPosition(position: Int) = layerPosition.floorEntry(position).value
-	private fun viewTypeOfLayer(layer: Layer) = layerViewType.indexOf(layer)
-	private fun viewTypeAtPosition(position: Int) = viewTypeOfLayer(layerAtPosition(position))
+	private fun layerOfViewType(viewType: Int) = viewTypePool.elementAt(viewType.toNormalViewType())
+	
+	private fun Int.toNormalViewType(): Int = this and 0x3FFFFFFF
+	private fun Int.toPlaceholderViewType(): Int = this or 0x40000000
+	private fun Int.isNormalViewType(): Boolean = this and 0x40000000 == 0
+	private fun Int.isPlaceholderViewType(): Boolean = this and 0x40000000 != 0
 	
 	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NemoRecyclerView.ViewHolder
 	{
 		return layerOfViewType(viewType).let { layer ->
 			when (layer)
 			{
-				is Group -> layer.viewProvider(LayoutInflater.from(parent.context), parent, false)
+				is Group ->
+				{
+					when
+					{
+						viewType.isNormalViewType() ->
+						{
+							layer.viewProvider(LayoutInflater.from(parent.context), parent, false)
+						}
+						layer.placeholderProvider != null ->
+						{
+							layer.placeholderProvider.invoke(LayoutInflater.from(parent.context), parent, false)
+						}
+						else ->
+						{
+							TODO("예외 던지기")
+						}
+					}
+				}
 				is Space -> TODO("not implemented")
 			}
 		}.let { binding ->
@@ -307,27 +327,50 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 	}
 	
 	override fun getItemCount(): Int = count
-	override fun getItemViewType(position: Int) = viewTypeAtPosition(position)
-	override fun getItemId(position: Int): Long = layerAtPosition(position).let { layer ->
+	override fun getItemViewType(position: Int): Int = layerAtPosition(position).let { layer ->
 		when (layer)
 		{
 			is Group ->
 			{
-				val modelPosition = position - layer.model.adapterPosition
-				layer.model.keyAt(modelPosition)
+				if (layer.model.isNotEmpty) viewTypePool.indexOf(layer)
+				else /* placeholder */ viewTypePool.indexOf(layer).toPlaceholderViewType()
+			}
+			is Space -> viewTypePool.indexOf(layer)
+		}
+	}
+	
+	override fun getItemId(position: Int): Long = layerAtPosition(position).let { layer ->
+		data class Pair(val key: Any?, val viewType: Int)
+		when (layer)
+		{
+			is Group ->
+			{
+				if (layer.model.isNotEmpty)
+				{
+					val modelPosition = position - layer.model.adapterPosition
+					Pair(layer.model.keyAt(modelPosition), viewTypePool.indexOf(layer))
+				}
+				else /* placeholder */
+				{
+					Pair("placeholder", viewTypePool.indexOf(layer).toPlaceholderViewType())
+				}
 			}
 			is Space ->
 			{
-				layer.tag
+				Pair("space", viewTypePool.indexOf(layer))
 			}
-		}?.let { key ->
-			if (!itemIds.contains(key))
+		}.let { (key, viewType) ->
+			if (key != null)
 			{
-				itemIds += key
+				if (!idPool.contains(key)) idPool += key
+				(viewType.toLong() shl Int.SIZE_BITS) or idPool.indexOf(key).toLong()
 			}
-			(viewTypeOfLayer(layer).toLong() shl Int.SIZE_BITS) or itemIds.indexOf(key).toLong()
+			else
+			{
+				RecyclerView.NO_ID
+			}
 		}
-	} ?: RecyclerView.NO_ID
+	}
 	
 	override fun bringForward(tag: Any)
 	{
