@@ -16,7 +16,7 @@ import kr.co.plasticcity.nemo.widget.Layer.Group
 import kr.co.plasticcity.nemo.widget.Layer.Space
 import java.util.*
 
-class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : RecyclerView(context, attrs, defStyleAttr)
+class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr)
 {
 	@DslMarker
 	private annotation class Marker
@@ -175,6 +175,7 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 						set(value) = TODO("not implemented")
 				}.block()
 			}.run {
+				block()
 				agent.add(Group(
 						tag = tag,
 						model = model as ModelInternal,
@@ -183,7 +184,6 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 						placeholderProvider = placeholderProvider,
 						onPlaceHolder = onPlaceHolder)
 				)
-				block()
 			}
 			
 			override fun space(block: SpaceDefine.() -> Unit) = object : SpaceDefine

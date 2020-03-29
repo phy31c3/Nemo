@@ -27,5 +27,4 @@
         app:layout_constraintTop_toBottomOf="@id/title"
         tools:text="헤더 컨텐츠" />
 
-
 </androidx.constraintlayout.widget.ConstraintLayout>

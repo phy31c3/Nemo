@@ -1,13 +1,11 @@
 package kr.co.plasticcity.nemo.demo
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.android.synthetic.main.activity_main.*
+import kr.co.plasticcity.nemo.demo.databinding.*
 import kr.co.plasticcity.nemo.widget.NemoRecyclerView
-import kr.co.plasticcity.nemo.demo.databinding.ActivityMainBinding
-import kr.co.plasticcity.nemo.demo.databinding.ItemHeaderBinding
-import kr.co.plasticcity.nemo.demo.databinding.ItemListBinding
-import kr.co.plasticcity.nemo.demo.databinding.ItemListHeaderBinding
 
 class MainActivity : AppCompatActivity()
 {
@@ -36,22 +34,43 @@ class MainActivity : AppCompatActivity()
 	
 	override fun onCreate(savedInstanceState: Bundle?)
 	{
-		val header = NemoRecyclerView.model(Header("NemoRecyclerView 데모", "쉽고 빠른 멀티 타입 리사이클러뷰 만들기!"))
+		val header = NemoRecyclerView.model(Header("NemoRecyclerView 데모", "쉽고 빠른 멀티 타입 리사이클러뷰 만들기!")) { title }
 		val listHeader = NemoRecyclerView.model(ItemHeader("아이템 갯수: 0"))
-		val list = NemoRecyclerView.model(mutableListOf<Item>())
+		val list = NemoRecyclerView.model<Item>(mutableListOf()) { key }
 		
 		super.onCreate(savedInstanceState)
 		ActivityMainBinding.inflate(layoutInflater).also { binding ->
 			setContentView(binding.root)
 			recyclerView {
 				group(header, ItemHeaderBinding::inflate) {
-				
+					bind { data, binding ->
+						binding.title.text = data.title
+						binding.content.text = data.content
+					}
 				}
 				group(listHeader, ItemListHeaderBinding::inflate) {
-				
+					bind { data, binding ->
+						binding.text.text = data.text
+						binding.genButton.setOnClickListener {
+						
+						}
+						binding.addItemButton.setOnClickListener {
+						
+						}
+						binding.deleteItemButton.setOnClickListener {
+						
+						}
+					}
 				}
 				group(list, ItemListBinding::inflate) {
-				
+					bind { data, binding ->
+						binding.root.setBackgroundColor(Color.parseColor(colors[data.key]))
+						binding.text.text = "${data.key}"
+					}
+					placeholder(ItemListPlaceholderBinding::inflate)
+				}
+				group(NemoRecyclerView.model("null"), ItemFooterBinding::inflate) {
+					/* empty */
 				}
 			}
 		}
@@ -60,4 +79,4 @@ class MainActivity : AppCompatActivity()
 
 private data class Header(val title: String, val content: String)
 private data class ItemHeader(val text: String)
-private data class Item(val text: String)
+private data class Item(val key: Int)
