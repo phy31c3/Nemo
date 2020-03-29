@@ -441,7 +441,7 @@ private interface ModelInternal
 	var adapterPosition: Int
 	
 	operator fun get(index: Int): Any?
-	fun keyAt(index: Int): Any?
+	fun keyAt(index: Int): Any
 }
 
 private val ModelInternal.isEmpty: Boolean
@@ -466,7 +466,7 @@ private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelI
 		}
 	
 	override fun get(index: Int): Any? = value
-	override fun keyAt(index: Int): Any? = value.key()
+	override fun keyAt(index: Int): Any = value.key() ?: 0
 }
 
 private class ListImpl<M>(val list: List<M>, val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.List<M>, List<M> by list
@@ -474,7 +474,7 @@ private class ListImpl<M>(val list: List<M>, val key: M.() -> Any?) : ModelInter
 	override var agent: Agent? = null
 	override var adapterPosition: Int = 0
 	
-	override fun keyAt(index: Int): Any? = this[index].key()
+	override fun keyAt(index: Int): Any = this[index].key() ?: index
 }
 
 private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.MutableList<M>, MutableList<M> by list
@@ -482,7 +482,7 @@ private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?
 	override var agent: Agent? = null
 	override var adapterPosition: Int = 0
 	
-	override fun keyAt(index: Int): Any? = this[index].key()
+	override fun keyAt(index: Int): Any = this[index].key() ?: index
 	
 	override fun add(element: M): Boolean
 	{
