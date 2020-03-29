@@ -52,7 +52,16 @@ class MainActivity : AppCompatActivity()
 					bind { data, binding ->
 						binding.text.text = data.text
 						binding.genButton.setOnClickListener {
-						
+							val newList = mutableListOf<Item>()
+							for (i in 0..19)
+							{
+								if (Math.random() < 0.5)
+								{
+									newList.add(Item(i))
+								}
+							}
+							list.update(newList)
+							listHeader.value = ItemHeader("아이템 갯수: ${list.size}")
 						}
 						binding.addItemButton.setOnClickListener {
 						
