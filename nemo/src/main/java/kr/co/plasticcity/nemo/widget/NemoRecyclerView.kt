@@ -266,8 +266,27 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 		registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver()
 		{
 			override fun onChanged() = reorder()
-			override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) = reorder()
-			override fun onItemRangeInserted(positionStart: Int, itemCount: Int) = reorder()
+			override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
+				if (itemCount > 0
+						&& layer is Group
+						&& layer.model.isEmpty
+						&& layer.placeholderProvider != null)
+				{
+					notifyItemInserted(positionStart)
+				}
+				reorder()
+			}
+			
+			override fun onItemRangeInserted(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
+				if (itemCount > 0
+						&& layer is Group
+						&& layer.model.size == itemCount
+						&& layer.placeholderProvider != null)
+				{
+					notifyItemRemoved(positionStart)
+				}
+				reorder()
+			}
 		})
 	}
 	
