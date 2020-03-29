@@ -78,9 +78,9 @@ class NemoRecyclerView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 		@Marker
 		object Position
 		{
-			const val BEGINNING = 0x7FFFFFFE
-			const val MIDDLE = 0x7FFFFFFD
-			const val END = 0x7FFFFFFB
+			const val BEGINNING = -0x00000002
+			const val MIDDLE = -0x00000003
+			const val END = -0x00000005
 		}
 	}
 	
@@ -269,7 +269,7 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 	private fun layerAtPosition(position: Int) = layerPosition.floorEntry(position).value
 	private fun layerOfViewType(viewType: Int) = viewTypePool.elementAt(viewType.toNormalViewType())
 	
-	private fun Int.toNormalViewType(): Int = this and 0x3FFFFFFF
+	private fun Int.toNormalViewType(): Int = this and -0x40000001
 	private fun Int.toPlaceholderViewType(): Int = this or 0x40000000
 	private fun Int.isNormalViewType(): Boolean = this and 0x40000000 == 0
 	private fun Int.isPlaceholderViewType(): Boolean = this and 0x40000000 != 0
