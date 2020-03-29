@@ -263,6 +263,12 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 	init
 	{
 		setHasStableIds(true)
+		registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver()
+		{
+			override fun onChanged() = reorder()
+			override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) = reorder()
+			override fun onItemRangeInserted(positionStart: Int, itemCount: Int) = reorder()
+		})
 	}
 	
 	fun add(group: Group)
@@ -274,6 +280,20 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 		group.model.agent = this
 		group.model.adapterPosition = count
 		count += group.size
+	}
+	
+	private fun reorder()
+	{
+		count = 0
+		layerPosition.clear()
+		layerOrder.forEach { layer ->
+			if (layer is Group)
+			{
+				layer.model.adapterPosition = count
+			}
+			layerPosition[count] = layer
+			count += layer.size
+		}
 	}
 	
 	private fun layerAtPosition(position: Int) = layerPosition.floorEntry(position).value
