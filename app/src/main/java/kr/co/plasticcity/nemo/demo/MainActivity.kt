@@ -49,11 +49,12 @@ class MainActivity : AppCompatActivity()
 					}
 				}
 				group(listHeader, ItemListHeaderBinding::inflate) {
+					val maxIndex = 100
 					bind { data, binding ->
 						binding.text.text = data.text
 						binding.genButton.setOnClickListener {
 							val newList = mutableListOf<Item>()
-							for (i in 0..1000)
+							for (i in 0..maxIndex)
 							{
 								if (Math.random() < 0.5)
 								{
@@ -64,10 +65,55 @@ class MainActivity : AppCompatActivity()
 							listHeader.value = ItemHeader("아이템 갯수: ${list.size}")
 						}
 						binding.addItemButton.setOnClickListener {
-						
+							val newItem = Item((Math.random() * (maxIndex + 1)).toInt(), (Math.random() * 20).toInt())
+							list.indexOfFirst { it.key == newItem.key }.let {
+								if (it != -1)
+								{
+									list[it] = newItem
+									null
+								}
+								else it
+							}?.also {
+								list.indexOfFirst { it.key > newItem.key }.also {
+									if (it != -1) list.add(it, newItem)
+									else list += newItem
+								}
+							}
+							listHeader.value = ItemHeader("아이템 갯수: ${list.size}")
 						}
 						binding.deleteItemButton.setOnClickListener {
-						
+							if (list.isEmpty()) return@setOnClickListener
+							val index = (Math.random() * list.size).toInt()
+							list.removeAt(index)
+							listHeader.value = ItemHeader("아이템 갯수: ${list.size}")
+						}
+						binding.deleteAllItemButton.setOnClickListener {
+							list.clear()
+							listHeader.value = ItemHeader("아이템 갯수: ${list.size}")
+						}
+						binding.deleteMultiItemButton.setOnClickListener {
+							val newList = mutableListOf<Item>()
+							for (i in list.indices)
+							{
+								if (Math.random() < 0.5)
+								{
+									newList.add(list[i])
+								}
+							}
+							list.removeAll(newList)
+							listHeader.value = ItemHeader("아이템 갯수: ${list.size}")
+						}
+						binding.retainMultiItemButton.setOnClickListener {
+							val newList = mutableListOf<Item>()
+							for (i in list.indices)
+							{
+								if (Math.random() < 0.5)
+								{
+									newList.add(list[i])
+								}
+							}
+							list.retainAll(newList)
+							listHeader.value = ItemHeader("아이템 갯수: ${list.size}")
 						}
 					}
 				}
