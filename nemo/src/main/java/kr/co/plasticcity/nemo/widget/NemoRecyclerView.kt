@@ -135,6 +135,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				var onBind: ViewHolder.(Any?, ViewBinding) -> Unit = { _, _ -> }
 				var placeholderProvider: ViewProvider? = null
 				var onPlaceHolder: (ViewHolder.(ViewBinding) -> Unit)? = null
+				var divider: Group.Divider? = null
 				
 				override var allowDragAndDrop: Boolean
 					get() = TODO("not implemented")
@@ -155,24 +156,26 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 					onPlaceHolder = block as? ViewHolder.(ViewBinding) -> Unit
 				}
 				
-				override fun divider(block: DividerDefine.() -> Unit) = object : DividerDefine
+				override fun divider(block: DividerDefine.() -> Unit)
 				{
-					override var sizeDp: Int
-						get() = TODO("not implemented")
-						set(value) = TODO("not implemented")
-					override var color: String
-						get() = TODO("not implemented")
-						set(value) = TODO("not implemented")
-					override var colorRes: Int
-						get() = TODO("not implemented")
-						set(value) = TODO("not implemented")
-					override var drawableRes: Int
-						get() = TODO("not implemented")
-						set(value) = TODO("not implemented")
-					override var show: DividerDefine.Position.() -> Int
-						get() = TODO("not implemented")
-						set(value) = TODO("not implemented")
-				}.block()
+					object : DividerDefine
+					{
+						override var sizeDp: Int = 0
+						override var color: String = "#FFFFFF"
+						override var colorRes: Int = 0
+						override var drawableRes: Int = 0
+						override var show: DividerDefine.Position.() -> Int = { -0x00000001 }
+					}.also {
+						block(it)
+						divider = Group.Divider(
+								sizeDp = it.sizeDp,
+								color = it.color,
+								colorRes = it.colorRes,
+								drawableRes = it.drawableRes,
+								position = it.show(DividerDefine.Position)
+						)
+					}
+				}
 			}.run {
 				block()
 				agent.add(Group(
@@ -181,7 +184,8 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 						viewProvider = view,
 						onBind = onBind,
 						placeholderProvider = placeholderProvider,
-						onPlaceHolder = onPlaceHolder)
+						onPlaceHolder = onPlaceHolder,
+						divider = divider)
 				)
 			}
 			
@@ -227,11 +231,23 @@ private sealed class Layer(val tag: Any)
 	            val viewProvider: ViewProvider,
 	            val onBind: NemoRecyclerView.ViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
 	            val placeholderProvider: ViewProvider?,
-	            val onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)?
+	            val onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)?,
+	            val divider: Divider?
 	) : Layer(tag)
 	{
 		override val size: Int
 			get() = if (model.isNotEmpty) model.size else if (placeholderProvider != null) 1 else 0
+		
+		class Divider(val sizeDp: Int,
+		              val color: String,
+		              val colorRes: Int,
+		              val drawableRes: Int,
+		              val position: Int)
+		{
+			fun showBegin(): Boolean = position and 0x00000001 == 0
+			fun showMiddle(): Boolean = position and 0x00000002 == 0
+			fun showEnd(): Boolean = position and 0x00000004 == 0
+		}
 	}
 	
 	class Space(tag: Any) : Layer(tag)
