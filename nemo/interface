@@ -1,0 +1,46 @@
+###############################################################################################################################################
+### NemoRecyclerView ##########################################################################################################################
+###############################################################################################################################################
+
+val header = NemoRecyclerView.model(headerDTO)
+val accounts = NemoRecyclerView.model<AccountDTO>(accountDTOs) { acno + bkcd } // key: if not define then key is hashcode or null
+val groups = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout = false) {
+    useSnap = false
+    group("header", model = header, view = HeaderItemBinding::inflate) {
+        bind { data, binding ->
+			adapterPosition
+			modelPosition
+        }
+        divider {
+            sizeDp = 3
+            color = "#ff00ff00"
+            colorRes = R.color.divider
+            drawableRes = R.drawable.divider
+            show = { BEGINNING and MIDDLE and END }
+        }
+    }
+    space {
+        sizeDp = 100
+        color = "#ff00ff00"
+        colorRes = R.color.divider
+        fillViewport = true
+        fillWeight = 1
+    }
+    group("list", model = accounts, view = HeaderItemBinding::inflate) {
+		allowDragAndDrop = false
+		allowSwipeToDismiss = false
+		bind { data, binding ->
+			adapterPosition
+			modelPosition
+		}
+		placeholder(view = PlaceHolderBinding::inflate) { binding ->
+			adapterPosition
+			modelPosition
+		}
+    }
+}
+groups.bringForward("header")
+groups.bringToFront("header")
+groups.sendBackward("header")
+groups.sendToBack("header")
+groups.swap("header", "list")
