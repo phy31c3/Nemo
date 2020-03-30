@@ -135,7 +135,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 		fun <M> model(list: MutableList<M>, key: M.() -> Any? = { null }): Model.MutableList<M> = MutableListImpl(list, key)
 	}
 	
-	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL, reverseLayout: Boolean = false, block: Define.() -> Unit): GroupArrange = Agent().also { agent ->
+	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL, reverseLayout: Boolean = false, block: Define.() -> Unit): GroupArrange = Adapter().also { adapter ->
 		object : Define
 		{
 			override var useSnap: Boolean
@@ -191,7 +191,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				}
 			}.run {
 				block()
-				agent.add(Group(
+				adapter.add(Group(
 						tag = tag,
 						model = model as ModelInternal,
 						viewProvider = view,
@@ -227,7 +227,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			spaceDecoration.orientation = orientation
 			dividerDecoration.orientation = orientation
 			this@NemoRecyclerView.layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
-			this@NemoRecyclerView.adapter = agent
+			this@NemoRecyclerView.adapter = adapter
 		}
 	}
 }
@@ -277,7 +277,7 @@ private sealed class Layer(val tag: Any)
 	}
 }
 
-private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoRecyclerView.GroupArrange
+private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoRecyclerView.GroupArrange
 {
 	companion object
 	{
@@ -332,7 +332,7 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 		layerOrder += group
 		layerPosition[count] = group
 		layerArrayForViewType += group
-		group.model.agent = this
+		group.model.adapter = this
 		group.model.adapterPosition = count
 		count += group.size
 	}
@@ -544,7 +544,7 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 private interface ModelInternal
 {
 	val size: Int
-	var agent: Agent?
+	var adapter: Adapter?
 	var adapterPosition: Int
 	
 	operator fun get(index: Int): Any?
@@ -563,7 +563,7 @@ private val ModelInternal.lastIndex: Int
 private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.Singleton<M>
 {
 	override val size: Int = 1
-	override var agent: Agent? = null
+	override var adapter: Adapter? = null
 	override var adapterPosition: Int = 0
 	override var value: M = value
 		set(value)
@@ -571,7 +571,7 @@ private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelI
 			if (field != value)
 			{
 				field = value
-				agent?.notifyItemChanged(adapterPosition)
+				adapter?.notifyItemChanged(adapterPosition)
 			}
 		}
 	
@@ -581,7 +581,7 @@ private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelI
 
 private class ListImpl<M>(private val list: List<M>, private val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.List<M>, List<M> by list
 {
-	override var agent: Agent? = null
+	override var adapter: Adapter? = null
 	override var adapterPosition: Int = 0
 	
 	override fun keyAt(index: Int): Any = this[index].key() ?: index
@@ -593,7 +593,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 	
 	override val size: Int
 		get() = if (estimatedSize >= 0) estimatedSize else list.size
-	override var agent: Agent? = null
+	override var adapter: Adapter? = null
 	override var adapterPosition: Int = 0
 	
 	override fun keyAt(index: Int): Any = this[index].key() ?: index
@@ -602,20 +602,20 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 	{
 		val index = size
 		return list.add(element).alsoIf(true) {
-			agent?.notifyItemInserted(adapterPosition + index)
+			adapter?.notifyItemInserted(adapterPosition + index)
 		}
 	}
 	
 	override fun add(index: Int, element: M)
 	{
 		list.add(index, element)
-		agent?.notifyItemInserted(adapterPosition + index)
+		adapter?.notifyItemInserted(adapterPosition + index)
 	}
 	
 	override fun addAll(index: Int, elements: Collection<M>): Boolean
 	{
 		return list.addAll(index, elements).alsoIf(true) {
-			agent?.notifyItemRangeInserted(adapterPosition + index, elements.size)
+			adapter?.notifyItemRangeInserted(adapterPosition + index, elements.size)
 		}
 	}
 	
@@ -623,7 +623,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 	{
 		val index = size
 		return list.addAll(elements).alsoIf(true) {
-			agent?.notifyItemRangeInserted(adapterPosition + index, elements.size)
+			adapter?.notifyItemRangeInserted(adapterPosition + index, elements.size)
 		}
 	}
 	
@@ -631,14 +631,14 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 	{
 		val count = size
 		list.clear()
-		agent?.notifyItemRangeRemoved(adapterPosition, count)
+		adapter?.notifyItemRangeRemoved(adapterPosition, count)
 	}
 	
 	override fun remove(element: M): Boolean
 	{
 		val index = list.indexOf(element)
 		return list.remove(element).alsoIf(true) {
-			agent?.notifyItemRemoved(adapterPosition + index)
+			adapter?.notifyItemRemoved(adapterPosition + index)
 		}
 	}
 	
@@ -669,7 +669,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 		}
 		return list.removeAll(elements).alsoIf(true) {
 			ranges.forEach { range ->
-				agent?.notifyItemRangeRemoved(range.position, range.count)
+				adapter?.notifyItemRangeRemoved(range.position, range.count)
 			}
 		}
 	}
@@ -677,7 +677,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 	override fun removeAt(index: Int): M
 	{
 		return list.removeAt(index).also {
-			agent?.notifyItemRemoved(adapterPosition + index)
+			adapter?.notifyItemRemoved(adapterPosition + index)
 		}
 	}
 	
@@ -708,7 +708,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 		}
 		return list.retainAll(elements).alsoIf(true) {
 			ranges.forEach { range ->
-				agent?.notifyItemRangeRemoved(range.position, range.count)
+				adapter?.notifyItemRangeRemoved(range.position, range.count)
 			}
 		}
 	}
@@ -718,7 +718,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 		return list.set(index, element).also { prevElement ->
 			if (prevElement != element)
 			{
-				agent?.notifyItemChanged(adapterPosition + index)
+				adapter?.notifyItemChanged(adapterPosition + index)
 			}
 		}
 	}
@@ -745,7 +745,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 			if (isNotEmpty())
 			{
 				forEach { range ->
-					agent?.notifyItemRangeChanged(range.position, range.count)
+					adapter?.notifyItemRangeChanged(range.position, range.count)
 				}
 			}
 			clear()
@@ -785,7 +785,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 				{
 					if (insert.isNotEmpty())
 					{
-						agent?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
+						adapter?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 						lIndex += insert.size
 						insert.clear()
 					}
@@ -798,13 +798,13 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 					change.submit()
 					if (insert.isNotEmpty())
 					{
-						agent?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
+						adapter?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 						lIndex += insert.size
 						lMark += insert.size
 						insert.clear()
 					}
 					val count = lMark - lIndex
-					agent?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
+					adapter?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
 					lRealIndex += count
 					change.update(lIndex, list[lRealIndex], rElement)
 					++lIndex
@@ -815,13 +815,13 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 		change.submit()
 		if (insert.isNotEmpty())
 		{
-			agent?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
+			adapter?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 			lIndex += insert.size
 		}
 		if (lRealIndex < list.size)
 		{
 			val count = list.size - lRealIndex
-			agent?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
+			adapter?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
 		}
 		list.clear()
 		list.addAll(elements)
