@@ -11,7 +11,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import kr.co.plasticcity.nemo.alsoIf
-import kr.co.plasticcity.nemo.removeRange
 import kr.co.plasticcity.nemo.widget.Layer.Group
 import kr.co.plasticcity.nemo.widget.Layer.Space
 import java.util.*
@@ -488,7 +487,7 @@ private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelI
 	override fun keyAt(index: Int): Any = value.key() ?: 0
 }
 
-private class ListImpl<M>(val list: List<M>, val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.List<M>, List<M> by list
+private class ListImpl<M>(private val list: List<M>, private val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.List<M>, List<M> by list
 {
 	override var agent: Agent? = null
 	override var adapterPosition: Int = 0
@@ -496,8 +495,12 @@ private class ListImpl<M>(val list: List<M>, val key: M.() -> Any?) : ModelInter
 	override fun keyAt(index: Int): Any = this[index].key() ?: index
 }
 
-private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.MutableList<M>, MutableList<M> by list
+private class MutableListImpl<M>(private val list: MutableList<M>, private val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.MutableList<M>, MutableList<M> by list
 {
+	private var estimatedSize = -1
+	
+	override val size: Int
+		get() = if (estimatedSize >= 0) estimatedSize else list.size
 	override var agent: Agent? = null
 	override var adapterPosition: Int = 0
 	
@@ -656,12 +659,10 @@ private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?
 			clear()
 		}
 		
-		fun MutableList<Range>.update(lIndex: Int, rElement: M)
+		fun MutableList<Range>.update(lIndex: Int, lElement: M, rElement: M)
 		{
-			val lElement = list[lIndex]
 			if (lElement != rElement)
 			{
-				list[lIndex] = rElement
 				if (isEmpty() || last().next != lIndex)
 				{
 					this += Range(lIndex)
@@ -673,11 +674,14 @@ private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?
 			}
 		}
 		
+		estimatedSize = elements.size
 		var lIndex = 0
+		var lRealIndex = 0
 		val change = mutableListOf<Range>()
 		val insert = mutableListOf<M>()
 		elements.forEach { rElement ->
-			var lMark = list.findSameKey(lIndex, rElement.key())
+			var lMark = list.findSameKey(lRealIndex, rElement.key())
+			if (lMark != -1) lMark += lIndex - lRealIndex
 			when (lMark)
 			{
 				-1 /* no same key */ ->
@@ -689,42 +693,47 @@ private class MutableListImpl<M>(val list: MutableList<M>, val key: M.() -> Any?
 				{
 					if (insert.isNotEmpty())
 					{
-						addAll(lIndex, insert)
+						agent?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 						lIndex += insert.size
 						insert.clear()
 					}
-					change.update(lIndex, rElement)
+					change.update(lIndex, list[lRealIndex], rElement)
 					++lIndex
+					++lRealIndex
 				}
 				else /* lMark > lIndex */ ->
 				{
 					change.submit()
 					if (insert.isNotEmpty())
 					{
-						addAll(lIndex, insert)
+						agent?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 						lIndex += insert.size
 						lMark += insert.size
 						insert.clear()
 					}
-					list.removeRange(lIndex, lMark)
-					agent?.notifyItemRangeRemoved(adapterPosition + lIndex, lMark - lIndex)
-					change.update(lIndex, rElement)
+					val count = lMark - lIndex
+					agent?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
+					lRealIndex += count
+					change.update(lIndex, list[lRealIndex], rElement)
 					++lIndex
+					++lRealIndex
 				}
 			}
 		}
 		change.submit()
 		if (insert.isNotEmpty())
 		{
-			addAll(lIndex, insert)
+			agent?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 			lIndex += insert.size
 		}
-		if (lIndex < list.size)
+		if (lRealIndex < list.size)
 		{
-			val count = list.size - lIndex
-			list.removeRange(lIndex, list.size)
+			val count = list.size - lRealIndex
 			agent?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
 		}
+		list.clear()
+		list.addAll(elements)
+		estimatedSize = -1
 	}
 	
 	private inner class Range(val index: Int, val padding: Int = 0)
