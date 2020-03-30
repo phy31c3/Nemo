@@ -184,7 +184,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 								color = it.color,
 								colorRes = it.colorRes,
 								drawableRes = it.drawableRes,
-								position = it.show(DividerDefine.Position)
+								show = it.show(DividerDefine.Position)
 						)
 					}
 				}
@@ -252,15 +252,20 @@ private sealed class Layer(val tag: Any)
 		override val size: Int
 			get() = if (model.isNotEmpty) model.size else if (placeholderProvider != null) 1 else 0
 		
-		class Divider(val sizeDp: Int,
-		              val color: String,
-		              val colorRes: Int,
-		              val drawableRes: Int,
-		              val position: Int)
+		data class Divider(val sizeDp: Int,
+		                   val color: String,
+		                   val colorRes: Int,
+		                   val drawableRes: Int,
+		                   val show: Int,
+		                   val isFirst: Boolean = false,
+		                   val isLast: Boolean = false)
 		{
-			fun showBegin(): Boolean = position and 0x00000001 == 0
-			fun showMiddle(): Boolean = position and 0x00000002 == 0
-			fun showEnd(): Boolean = position and 0x00000004 == 0
+			private fun Int.beginning() = this and 0x00000001 == 0
+			private fun Int.middle() = this and 0x00000002 == 0
+			private fun Int.end() = this and 0x00000004 == 0
+			
+			val drawBeginning: Boolean get() = isFirst && show.beginning()
+			val drawEnd: Boolean get() = !isLast && show.middle() || isLast && show.end()
 		}
 	}
 	
@@ -352,55 +357,63 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 	private fun Int.isNormalViewType(): Boolean = this and 0x40000000 == 0
 	private fun Int.isPlaceholderViewType(): Boolean = this and 0x40000000 != 0
 	
-	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NemoRecyclerView.ViewHolder
-	{
-		return layerOfViewType(viewType).let { layer ->
-			when (layer)
+	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = layerOfViewType(viewType).let { layer ->
+		when (layer)
+		{
+			is Group ->
 			{
-				is Group ->
+				when
 				{
-					when
+					viewType.isNormalViewType() ->
 					{
-						viewType.isNormalViewType() ->
-						{
-							layer.viewProvider(LayoutInflater.from(parent.context), parent, false)
-						}
-						layer.placeholderProvider != null ->
-						{
-							layer.placeholderProvider.invoke(LayoutInflater.from(parent.context), parent, false)
-						}
-						else ->
-						{
-							TODO("예외 던지기")
-						}
+						layer.viewProvider(LayoutInflater.from(parent.context), parent, false)
+					}
+					layer.placeholderProvider != null ->
+					{
+						layer.placeholderProvider.invoke(LayoutInflater.from(parent.context), parent, false)
+					}
+					else ->
+					{
+						TODO("예외 던지기")
 					}
 				}
-				is Space -> TODO("not implemented")
 			}
-		}.let { binding ->
-			NemoRecyclerView.ViewHolder(binding)
+			is Space -> TODO("not implemented")
 		}
+	}.let { binding ->
+		NemoRecyclerView.ViewHolder(binding)
 	}
 	
-	override fun onBindViewHolder(holder: NemoRecyclerView.ViewHolder, position: Int)
-	{
-		layerAtPosition(position).also { layer ->
-			when (layer)
+	override fun onBindViewHolder(holder: NemoRecyclerView.ViewHolder, position: Int) = layerAtPosition(position).let { layer ->
+		when (layer)
+		{
+			is Group ->
 			{
-				is Group ->
+				val modelPosition = position - layer.model.adapterPosition
+				
+				/* set divider */
+				if (layer.divider != null)
 				{
-					if (layer.model.isNotEmpty)
-					{
-						holder.modelPosition = position - layer.model.adapterPosition
-						layer.onBind(holder, layer.model[holder.modelPosition], holder.binding)
-					}
-					else if (layer.onPlaceHolder != null)
-					{
-						layer.onPlaceHolder.invoke(holder, holder.binding)
-					}
+					holder.binding.root.setTag(VIEW_TAG_DIVIDER,
+							layer.divider.copy(
+									isFirst = modelPosition == 0,
+									isLast = modelPosition == layer.model.lastIndex)
+					)
 				}
-				is Space -> TODO("not implemented")
+				
+				/* callback */
+				if (layer.model.isNotEmpty)
+				{
+					holder.modelPosition = modelPosition
+					layer.onBind(holder, layer.model[modelPosition], holder.binding)
+				}
+				else if (layer.onPlaceHolder != null)
+				{
+					holder.modelPosition = modelPosition /* maybe always 0 */
+					layer.onPlaceHolder.invoke(holder, holder.binding)
+				}
 			}
+			is Space -> TODO("not implemented")
 		}
 	}
 	
@@ -482,6 +495,9 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 /*###################################################################################################################################
  * ItemDecoration
  *###################################################################################################################################*/
+private const val VIEW_TAG_SPACE = 0x0D34A130
+private const val VIEW_TAG_DIVIDER = 0x0D34A131
+
 private class SpaceDecoration : RecyclerView.ItemDecoration()
 {
 	@RecyclerView.Orientation
@@ -489,12 +505,13 @@ private class SpaceDecoration : RecyclerView.ItemDecoration()
 	
 	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State)
 	{
-	
+		TODO("not implemented")
 	}
 	
 	override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State)
 	{
 		super.onDraw(c, parent, state)
+		TODO("not implemented")
 	}
 }
 
@@ -505,12 +522,13 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 	
 	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State)
 	{
-	
+		TODO("not implemented")
 	}
 	
 	override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State)
 	{
 		super.onDraw(c, parent, state)
+		TODO("not implemented")
 	}
 }
 
@@ -532,6 +550,9 @@ private val ModelInternal.isEmpty: Boolean
 
 private val ModelInternal.isNotEmpty: Boolean
 	get() = size > 0
+
+private val ModelInternal.lastIndex: Int
+	get() = size - 1
 
 private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.Singleton<M>
 {
