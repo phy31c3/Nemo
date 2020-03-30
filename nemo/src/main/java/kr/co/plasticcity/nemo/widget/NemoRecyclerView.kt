@@ -91,6 +91,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			const val BEGINNING = -0x00000002
 			const val MIDDLE = -0x00000003
 			const val END = -0x00000005
+			const val IN_PLACEHOLDER = -0x00000009
 		}
 	}
 	
@@ -257,8 +258,8 @@ private sealed class Layer(val tag: Any)
 		                   val colorRes: Int,
 		                   val drawableRes: Int,
 		                   val show: Int,
-		                   val isFirst: Boolean = false,
-		                   val isLast: Boolean = false)
+		                   val isFirst: Boolean = true,
+		                   val isLast: Boolean = true)
 		{
 			private fun Int.beginning() = this and 0x00000001 == 0
 			private fun Int.middle() = this and 0x00000002 == 0
@@ -266,6 +267,7 @@ private sealed class Layer(val tag: Any)
 			
 			val drawBeginning: Boolean get() = isFirst && show.beginning()
 			val drawEnd: Boolean get() = !isLast && show.middle() || isLast && show.end()
+			val showInPlaceholder: Boolean get() = show and 0x00000008 == 0
 		}
 	}
 	
@@ -366,11 +368,15 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 				{
 					viewType.isNormalViewType() ->
 					{
-						layer.viewProvider(LayoutInflater.from(parent.context), parent, false)
+						layer.viewProvider(LayoutInflater.from(parent.context), parent, false).also { binding ->
+							if (layer.divider != null) binding.root.setTag(VIEW_TAG_DIVIDER, layer.divider)
+						}
 					}
 					layer.placeholderProvider != null ->
 					{
-						layer.placeholderProvider.invoke(LayoutInflater.from(parent.context), parent, false)
+						layer.placeholderProvider.invoke(LayoutInflater.from(parent.context), parent, false).also { binding ->
+							if (layer.divider != null && layer.divider.showInPlaceholder) binding.root.setTag(VIEW_TAG_DIVIDER, layer.divider)
+						}
 					}
 					else ->
 					{
@@ -392,10 +398,10 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 				val modelPosition = position - layer.model.adapterPosition
 				
 				/* set divider */
-				if (layer.divider != null)
-				{
+				holder.binding.root.getTag(VIEW_TAG_DIVIDER)?.also { divider ->
+					divider as Group.Divider
 					holder.binding.root.setTag(VIEW_TAG_DIVIDER,
-							layer.divider.copy(
+							divider.copy(
 									isFirst = modelPosition == 0,
 									isLast = modelPosition == layer.model.lastIndex)
 					)

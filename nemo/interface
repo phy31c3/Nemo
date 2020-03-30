@@ -16,7 +16,7 @@ val groups = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout
             color = "#ff00ff00"
             colorRes = R.color.divider
             drawableRes = R.drawable.divider
-            show = { BEGINNING and MIDDLE and END }
+            show = { BEGINNING and MIDDLE and END and IN_PLACEHOLDER }
         }
     }
     space {
