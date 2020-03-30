@@ -3,8 +3,11 @@
 package kr.co.plasticcity.nemo.widget
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Rect
 import android.util.AttributeSet
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.collection.ArraySet
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -17,6 +20,15 @@ import java.util.*
 
 class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr)
 {
+	private val spaceDecoration: SpaceDecoration = SpaceDecoration()
+	private val dividerDecoration: DividerDecoration = DividerDecoration()
+	
+	init
+	{
+		addItemDecoration(spaceDecoration)
+		addItemDecoration(dividerDecoration)
+	}
+	
 	@DslMarker
 	private annotation class Marker
 	
@@ -211,6 +223,8 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			}
 		}.apply {
 			block()
+			spaceDecoration.orientation = orientation
+			dividerDecoration.orientation = orientation
 			this@NemoRecyclerView.layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
 			this@NemoRecyclerView.adapter = agent
 		}
@@ -462,6 +476,41 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 	override fun swap(tag1: Any, tag2: Any)
 	{
 		TODO("not implemented")
+	}
+}
+
+/*###################################################################################################################################
+ * ItemDecoration
+ *###################################################################################################################################*/
+private class SpaceDecoration : RecyclerView.ItemDecoration()
+{
+	@RecyclerView.Orientation
+	var orientation: Int = RecyclerView.VERTICAL
+	
+	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State)
+	{
+	
+	}
+	
+	override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State)
+	{
+		super.onDraw(c, parent, state)
+	}
+}
+
+private class DividerDecoration : RecyclerView.ItemDecoration()
+{
+	@RecyclerView.Orientation
+	var orientation: Int = RecyclerView.VERTICAL
+	
+	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State)
+	{
+	
+	}
+	
+	override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State)
+	{
+		super.onDraw(c, parent, state)
 	}
 }
 
