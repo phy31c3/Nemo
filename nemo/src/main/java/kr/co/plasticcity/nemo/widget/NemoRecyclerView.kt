@@ -13,6 +13,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.collection.ArraySet
+import androidx.core.view.children
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -22,6 +23,7 @@ import kr.co.plasticcity.nemo.toPx
 import kr.co.plasticcity.nemo.widget.Layer.Group
 import kr.co.plasticcity.nemo.widget.Layer.Space
 import java.util.*
+import kotlin.math.roundToInt
 
 class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr)
 {
@@ -277,13 +279,14 @@ private sealed class Layer(val tag: Any)
 			val width: Int get() = if (drawable.intrinsicWidth != -1) drawable.intrinsicWidth else sizePx
 			val height: Int get() = if (drawable.intrinsicHeight != -1) drawable.intrinsicHeight else sizePx
 			
-			private fun Int.beginning() = this and 0x00000001 == 0
-			private fun Int.middle() = this and 0x00000002 == 0
-			private fun Int.end() = this and 0x00000004 == 0
+			val showInPlaceholder: Boolean get() = show and 0x00000008 == 0
 			
 			val drawBeginning: Boolean get() = isFirst && show.beginning()
 			val drawEnd: Boolean get() = !isLast && show.middle() || isLast && show.end()
-			val showInPlaceholder: Boolean get() = show and 0x00000008 == 0
+			
+			private fun Int.beginning() = this and 0x00000001 == 0
+			private fun Int.middle() = this and 0x00000002 == 0
+			private fun Int.end() = this and 0x00000004 == 0
 		}
 	}
 	
@@ -527,13 +530,13 @@ private class SpaceDecoration : RecyclerView.ItemDecoration()
 	
 	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State)
 	{
-		TODO("not implemented")
+		// TODO: 2020-04-01 "not implemented"
 	}
 	
 	override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State)
 	{
 		super.onDraw(c, parent, state)
-		TODO("not implemented")
+		// TODO: 2020-04-01 "not implemented"
 	}
 }
 
@@ -551,10 +554,66 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 		outRect.set(0, 0, 0, 0)
 	}
 	
-	override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State)
+	override fun onDraw(canvas: Canvas, parent: RecyclerView, state: RecyclerView.State)
 	{
-		super.onDraw(c, parent, state)
-		TODO("not implemented")
+		if (parent.layoutManager == null) return
+		
+		canvas.save()
+		if (orientation == DividerItemDecoration.VERTICAL)
+		{
+			val left: Int
+			val right: Int
+			val bounds = Rect()
+			if (parent.clipToPadding)
+			{
+				left = parent.paddingLeft
+				right = parent.width - parent.paddingRight
+				canvas.clipRect(left, parent.paddingTop, right, parent.height - parent.paddingBottom)
+			}
+			else
+			{
+				left = 0
+				right = parent.width
+			}
+			parent.children.forEach { child ->
+				(child.getTag(VIEW_TAG_DIVIDER) as? Group.Divider)?.let { divider ->
+					parent.getDecoratedBoundsWithMargins(child, bounds)
+					val bottom = bounds.bottom + child.translationY.roundToInt()
+					val top = bottom - divider.height
+					divider.drawable.alpha = (child.alpha * 255).toInt()
+					divider.drawable.setBounds(left, top, right, bottom)
+					divider.drawable.draw(canvas)
+				}
+			}
+		}
+		else
+		{
+			val top: Int
+			val bottom: Int
+			val bounds = Rect()
+			if (parent.clipToPadding)
+			{
+				top = parent.paddingTop
+				bottom = parent.height - parent.paddingBottom
+				canvas.clipRect(parent.paddingLeft, top, parent.width - parent.paddingRight, bottom)
+			}
+			else
+			{
+				top = 0
+				bottom = parent.height
+			}
+			parent.children.forEach { child ->
+				(child.getTag(VIEW_TAG_DIVIDER) as? Group.Divider)?.let { divider ->
+					parent.getDecoratedBoundsWithMargins(child, bounds)
+					val right = bounds.right + child.translationX.roundToInt()
+					val left = right - divider.width
+					divider.drawable.alpha = (child.alpha * 255).toInt()
+					divider.drawable.setBounds(left, top, right, bottom)
+					divider.drawable.draw(canvas)
+				}
+			}
+		}
+		canvas.restore()
 	}
 }
 
