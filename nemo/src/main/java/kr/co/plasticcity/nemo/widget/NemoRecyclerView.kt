@@ -583,9 +583,9 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 			parent.children.forEach { child ->
 				(child.getTag(VIEW_TAG_DIVIDER) as? Group.Divider)?.let { divider ->
 					parent.getDecoratedBoundsWithMargins(child, bounds)
-					val bottom = bounds.bottom + child.translationY.roundToInt()
+					val bottom = bounds.bottom + if (divider.keepPosition) 0 else child.translationY.roundToInt()
 					val top = bottom - divider.height
-					divider.drawable.alpha = (child.alpha * 255).toInt()
+					if (!divider.keepAlpha) divider.drawable.alpha = (child.alpha * 255).toInt()
 					divider.drawable.setBounds(left, top, right, bottom)
 					divider.drawable.draw(canvas)
 				}
@@ -610,9 +610,9 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 			parent.children.forEach { child ->
 				(child.getTag(VIEW_TAG_DIVIDER) as? Group.Divider)?.let { divider ->
 					parent.getDecoratedBoundsWithMargins(child, bounds)
-					val right = bounds.right + child.translationX.roundToInt()
+					val right = bounds.right + if (divider.keepPosition) 0 else child.translationX.roundToInt()
 					val left = right - divider.width
-					divider.drawable.alpha = (child.alpha * 255).toInt()
+					if (!divider.keepAlpha) divider.drawable.alpha = (child.alpha * 255).toInt()
 					divider.drawable.setBounds(left, top, right, bottom)
 					divider.drawable.draw(canvas)
 				}
