@@ -126,7 +126,7 @@ class MainActivity : AppCompatActivity()
 					divider {
 						sizeDp = 2
 						color = "#FF808080"
-						show = { BEGINNING and MIDDLE and END and INCLUDE_PLACEHOLDER }
+						show = { BEGINNING and MIDDLE and END and INCLUDE_PLACEHOLDER and KEEP_ALPHA and KEEP_POSITION }
 					}
 				}
 				group(NemoRecyclerView.model("null"), ItemFooterBinding::inflate) {

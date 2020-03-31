@@ -103,6 +103,8 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			const val MIDDLE = -0x00000003
 			const val END = -0x00000005
 			const val INCLUDE_PLACEHOLDER = -0x00000009
+			const val KEEP_ALPHA = -0x00000011
+			const val KEEP_POSITION = -0x00000021
 		}
 	}
 	
@@ -276,17 +278,20 @@ private sealed class Layer(val tag: Any)
 		                   val isFirst: Boolean = true,
 		                   val isLast: Boolean = true)
 		{
-			val width: Int get() = if (drawable.intrinsicWidth != -1) drawable.intrinsicWidth else sizePx
-			val height: Int get() = if (drawable.intrinsicHeight != -1) drawable.intrinsicHeight else sizePx
-			
-			val showInPlaceholder: Boolean get() = show and 0x00000008 == 0
-			
-			val drawBeginning: Boolean get() = isFirst && show.beginning()
-			val drawEnd: Boolean get() = !isLast && show.middle() || isLast && show.end()
+			val width get() = if (drawable.intrinsicWidth != -1) drawable.intrinsicWidth else sizePx
+			val height get() = if (drawable.intrinsicHeight != -1) drawable.intrinsicHeight else sizePx
 			
 			private fun Int.beginning() = this and 0x00000001 == 0
 			private fun Int.middle() = this and 0x00000002 == 0
 			private fun Int.end() = this and 0x00000004 == 0
+			
+			val drawBeginning get() = isFirst && show.beginning()
+			val drawEnd get() = !isLast && show.middle() || isLast && show.end()
+			
+			val includePlaceholder get() = show and 0x00000008 == 0
+			
+			val keepAlpha get() = show and 0x00000010 == 0
+			val keepPosition get() = show and 0x00000020 == 0
 		}
 	}
 	
@@ -394,7 +399,7 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					layer.placeholderProvider != null ->
 					{
 						layer.placeholderProvider.invoke(LayoutInflater.from(parent.context), parent, false).also { binding ->
-							if (layer.divider != null && layer.divider.showInPlaceholder) binding.root.setTag(VIEW_TAG_DIVIDER, layer.divider)
+							if (layer.divider != null && layer.divider.includePlaceholder) binding.root.setTag(VIEW_TAG_DIVIDER, layer.divider)
 						}
 					}
 					else ->
