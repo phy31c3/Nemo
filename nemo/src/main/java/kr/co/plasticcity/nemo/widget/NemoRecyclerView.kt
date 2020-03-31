@@ -102,7 +102,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			const val BEGINNING = -0x00000002
 			const val MIDDLE = -0x00000003
 			const val END = -0x00000005
-			const val IN_PLACEHOLDER = -0x00000009
+			const val INCLUDE_PLACEHOLDER = -0x00000009
 		}
 	}
 	
@@ -190,7 +190,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 					override var color: String = "#00000000"
 					override var colorRes: Int = 0
 					override var drawableRes: Int = 0
-					override var show: DividerDefine.Position.() -> Int = { -0x00000001 }
+					override var show: DividerDefine.Position.() -> Int = { -0x00000003 }
 				}.let {
 					block(it)
 					when
