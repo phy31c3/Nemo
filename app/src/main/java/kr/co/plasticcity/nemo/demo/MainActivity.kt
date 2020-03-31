@@ -125,7 +125,7 @@ class MainActivity : AppCompatActivity()
 					}
 					divider {
 						sizeDp = 2
-						color = "#FF000000"
+						color = "#FF808080"
 						show = { BEGINNING and MIDDLE and END and INCLUDE_PLACEHOLDER }
 					}
 				}
