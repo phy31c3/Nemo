@@ -4,16 +4,21 @@ package kr.co.plasticcity.nemo.widget
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.collection.ArraySet
+import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import kr.co.plasticcity.nemo.alsoIf
+import kr.co.plasticcity.nemo.toPx
 import kr.co.plasticcity.nemo.widget.Layer.Group
 import kr.co.plasticcity.nemo.widget.Layer.Space
 import java.util.*
@@ -80,6 +85,10 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 	interface DividerDefine
 	{
 		var sizeDp: Int
+		
+		/**
+		 * ex) "#FFFFFFFF"
+		 */
 		var color: String
 		var colorRes: Int
 		var drawableRes: Int
@@ -135,7 +144,11 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 		fun <M> model(list: MutableList<M>, key: M.() -> Any? = { null }): Model.MutableList<M> = MutableListImpl(list, key)
 	}
 	
-	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL, reverseLayout: Boolean = false, block: Define.() -> Unit): GroupArrange = Adapter().also { adapter ->
+	@Suppress("RemoveRedundantQualifierName")
+	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL,
+	                    reverseLayout: Boolean = false,
+	                    block: Define.() -> Unit
+	): GroupArrange = kr.co.plasticcity.nemo.widget.Adapter().also { adapter ->
 		object : Define
 		{
 			override var useSnap: Boolean
@@ -169,22 +182,24 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 					onPlaceHolder = block as? ViewHolder.(ViewBinding) -> Unit
 				}
 				
-				override fun divider(block: DividerDefine.() -> Unit)
+				override fun divider(block: DividerDefine.() -> Unit) = object : DividerDefine
 				{
-					object : DividerDefine
+					override var sizeDp: Int = 0
+					override var color: String = "#00000000"
+					override var colorRes: Int = 0
+					override var drawableRes: Int = 0
+					override var show: DividerDefine.Position.() -> Int = { -0x00000001 }
+				}.let {
+					block(it)
+					when
 					{
-						override var sizeDp: Int = 0
-						override var color: String = "#FFFFFF"
-						override var colorRes: Int = 0
-						override var drawableRes: Int = 0
-						override var show: DividerDefine.Position.() -> Int = { -0x00000001 }
-					}.also {
-						block(it)
+						it.drawableRes != 0 -> context.getDrawable(it.drawableRes)
+						it.colorRes != 0 -> ColorDrawable(context.getColor(it.colorRes))
+						else -> ColorDrawable(Color.parseColor(it.color))
+					}.let { drawable ->
 						divider = Group.Divider(
-								sizeDp = it.sizeDp,
-								color = it.color,
-								colorRes = it.colorRes,
-								drawableRes = it.drawableRes,
+								sizePx = it.sizeDp.toPx(),
+								drawable = drawable,
 								show = it.show(DividerDefine.Position)
 						)
 					}
@@ -253,14 +268,15 @@ private sealed class Layer(val tag: Any)
 		override val size: Int
 			get() = if (model.isNotEmpty) model.size else if (placeholderProvider != null) 1 else 0
 		
-		data class Divider(val sizeDp: Int,
-		                   val color: String,
-		                   val colorRes: Int,
-		                   val drawableRes: Int,
+		data class Divider(val sizePx: Int,
+		                   val drawable: Drawable,
 		                   val show: Int,
 		                   val isFirst: Boolean = true,
 		                   val isLast: Boolean = true)
 		{
+			val width: Int get() = if (drawable.intrinsicWidth != -1) drawable.intrinsicWidth else sizePx
+			val height: Int get() = if (drawable.intrinsicHeight != -1) drawable.intrinsicHeight else sizePx
+			
 			private fun Int.beginning() = this and 0x00000001 == 0
 			private fun Int.middle() = this and 0x00000002 == 0
 			private fun Int.end() = this and 0x00000004 == 0
@@ -526,9 +542,13 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 	@RecyclerView.Orientation
 	var orientation: Int = RecyclerView.VERTICAL
 	
-	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State)
-	{
-		TODO("not implemented")
+	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = (view.getTag(VIEW_TAG_DIVIDER) as? Group.Divider)?.let { divider ->
+		if (orientation == DividerItemDecoration.VERTICAL)
+			outRect.set(0, 0, 0, divider.height)
+		else
+			outRect.set(0, 0, divider.width, 0)
+	} ?: Unit.also {
+		outRect.set(0, 0, 0, 0)
 	}
 	
 	override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State)
