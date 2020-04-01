@@ -3,20 +3,39 @@
 package kr.co.plasticcity.nemo.widget
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.collection.ArraySet
+import androidx.core.view.children
+import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import kr.co.plasticcity.nemo.alsoIf
+import kr.co.plasticcity.nemo.toPx
 import kr.co.plasticcity.nemo.widget.Layer.Group
 import kr.co.plasticcity.nemo.widget.Layer.Space
 import java.util.*
+import kotlin.math.roundToInt
 
 class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr)
 {
+	private val spaceDecoration: SpaceDecoration = SpaceDecoration()
+	private val dividerDecoration: DividerDecoration = DividerDecoration()
+	
+	init
+	{
+		addItemDecoration(spaceDecoration)
+		addItemDecoration(dividerDecoration)
+	}
+	
 	@DslMarker
 	private annotation class Marker
 	
@@ -68,6 +87,10 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 	interface DividerDefine
 	{
 		var sizeDp: Int
+		
+		/**
+		 * ex) "#FFFFFFFF"
+		 */
 		var color: String
 		var colorRes: Int
 		var drawableRes: Int
@@ -79,6 +102,9 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			const val BEGINNING = -0x00000002
 			const val MIDDLE = -0x00000003
 			const val END = -0x00000005
+			const val INCLUDE_PLACEHOLDER = -0x00000009
+			const val KEEP_ALPHA = -0x00000011
+			const val KEEP_POSITION = -0x00000021
 		}
 	}
 	
@@ -122,7 +148,11 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 		fun <M> model(list: MutableList<M>, key: M.() -> Any? = { null }): Model.MutableList<M> = MutableListImpl(list, key)
 	}
 	
-	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL, reverseLayout: Boolean = false, block: Define.() -> Unit): GroupArrange = Agent().also { agent ->
+	@Suppress("RemoveRedundantQualifierName")
+	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL,
+	                    reverseLayout: Boolean = false,
+	                    block: Define.() -> Unit
+	): GroupArrange = kr.co.plasticcity.nemo.widget.Adapter().also { adapter ->
 		object : Define
 		{
 			override var useSnap: Boolean
@@ -135,6 +165,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				var onBind: ViewHolder.(Any?, ViewBinding) -> Unit = { _, _ -> }
 				var placeholderProvider: ViewProvider? = null
 				var onPlaceHolder: (ViewHolder.(ViewBinding) -> Unit)? = null
+				var divider: Group.Divider? = null
 				
 				override var allowDragAndDrop: Boolean
 					get() = TODO("not implemented")
@@ -157,31 +188,36 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				
 				override fun divider(block: DividerDefine.() -> Unit) = object : DividerDefine
 				{
-					override var sizeDp: Int
-						get() = TODO("not implemented")
-						set(value) = TODO("not implemented")
-					override var color: String
-						get() = TODO("not implemented")
-						set(value) = TODO("not implemented")
-					override var colorRes: Int
-						get() = TODO("not implemented")
-						set(value) = TODO("not implemented")
-					override var drawableRes: Int
-						get() = TODO("not implemented")
-						set(value) = TODO("not implemented")
-					override var show: DividerDefine.Position.() -> Int
-						get() = TODO("not implemented")
-						set(value) = TODO("not implemented")
-				}.block()
+					override var sizeDp: Int = 0
+					override var color: String = "#00000000"
+					override var colorRes: Int = 0
+					override var drawableRes: Int = 0
+					override var show: DividerDefine.Position.() -> Int = { -0x00000003 }
+				}.let {
+					block(it)
+					when
+					{
+						it.drawableRes != 0 -> context.getDrawable(it.drawableRes)
+						it.colorRes != 0 -> ColorDrawable(context.getColor(it.colorRes))
+						else -> ColorDrawable(Color.parseColor(it.color))
+					}.let { drawable ->
+						divider = Group.Divider(
+								sizePx = it.sizeDp.toPx(),
+								drawable = drawable,
+								show = it.show(DividerDefine.Position)
+						)
+					}
+				}
 			}.run {
 				block()
-				agent.add(Group(
+				adapter.add(Group(
 						tag = tag,
 						model = model as ModelInternal,
 						viewProvider = view,
 						onBind = onBind,
 						placeholderProvider = placeholderProvider,
-						onPlaceHolder = onPlaceHolder)
+						onPlaceHolder = onPlaceHolder,
+						divider = divider)
 				)
 			}
 			
@@ -207,14 +243,16 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			}
 		}.apply {
 			block()
+			spaceDecoration.orientation = orientation
+			dividerDecoration.orientation = orientation
 			this@NemoRecyclerView.layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
-			this@NemoRecyclerView.adapter = agent
+			this@NemoRecyclerView.adapter = adapter
 		}
 	}
 }
 
 /*###################################################################################################################################
- * Core
+ * Layer
  *###################################################################################################################################*/
 private typealias ViewProvider = (LayoutInflater, ViewGroup, Boolean) -> ViewBinding
 
@@ -227,11 +265,34 @@ private sealed class Layer(val tag: Any)
 	            val viewProvider: ViewProvider,
 	            val onBind: NemoRecyclerView.ViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
 	            val placeholderProvider: ViewProvider?,
-	            val onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)?
+	            val onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)?,
+	            val divider: Divider?
 	) : Layer(tag)
 	{
 		override val size: Int
 			get() = if (model.isNotEmpty) model.size else if (placeholderProvider != null) 1 else 0
+		
+		data class Divider(val sizePx: Int,
+		                   val drawable: Drawable,
+		                   val show: Int,
+		                   val isFirst: Boolean = true,
+		                   val isLast: Boolean = true)
+		{
+			val width get() = if (drawable.intrinsicWidth != -1) drawable.intrinsicWidth else sizePx
+			val height get() = if (drawable.intrinsicHeight != -1) drawable.intrinsicHeight else sizePx
+			
+			private fun Int.beginning() = this and 0x00000001 == 0
+			private fun Int.middle() = this and 0x00000002 == 0
+			private fun Int.end() = this and 0x00000004 == 0
+			
+			val drawBeginning get() = isFirst && show.beginning()
+			val drawEnd get() = !isLast && show.middle() || isLast && show.end()
+			
+			val includePlaceholder get() = show and 0x00000008 == 0
+			
+			val keepAlpha get() = show and 0x00000010 == 0
+			val keepPosition get() = show and 0x00000020 == 0
+		}
 	}
 	
 	class Space(tag: Any) : Layer(tag)
@@ -240,7 +301,27 @@ private sealed class Layer(val tag: Any)
 	}
 }
 
-private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoRecyclerView.GroupArrange
+private val Layer.isEmpty: Boolean
+	get() = size == 0
+
+private val Layer.isNotEmpty: Boolean
+	get() = size > 0
+
+private val Layer.lastIndex: Int
+	get() = size - 1
+
+/*###################################################################################################################################
+ * Payload
+ *###################################################################################################################################*/
+private sealed class Payload
+{
+	object UpdateDivider : Payload()
+}
+
+/*###################################################################################################################################
+ * Adapter
+ *###################################################################################################################################*/
+private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoRecyclerView.GroupArrange
 {
 	companion object
 	{
@@ -266,25 +347,50 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 		{
 			override fun onChanged() = reorder()
 			override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
-				if (itemCount > 0
-						&& layer is Group
-						&& layer.model.isEmpty
-						&& layer.placeholderProvider != null)
+				if (itemCount > 0 && layer is Group)
 				{
-					notifyItemInserted(positionStart)
+					if (layer.model.isNotEmpty)
+					{
+						if /* first item removed */ (positionStart == layer.model.adapterPosition)
+						{
+							notifyItemChanged(layer.model.adapterPosition, Payload.UpdateDivider)
+						}
+						/* update last item divider */
+						notifyItemChanged(layer.model.lastPosition, Payload.UpdateDivider)
+					}
+					else if (layer.placeholderProvider != null)
+					{
+						/* for insert placeholder */
+						notifyItemInserted(positionStart)
+					}
 				}
 				reorder()
 			}
 			
 			override fun onItemRangeInserted(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
-				if (itemCount > 0
-						&& layer is Group
-						&& layer.model.size == itemCount
-						&& layer.placeholderProvider != null)
+				if (itemCount > 0 && layer is Group)
 				{
-					notifyItemRemoved(positionStart)
+					if /* first item inserted */ (positionStart == layer.model.adapterPosition)
+					{
+						notifyItemChanged(layer.model.adapterPosition + itemCount, Payload.UpdateDivider)
+					}
+					if /* last item inserted */ (positionStart + itemCount == layer.model.lastPosition + 1)
+					{
+						notifyItemChanged(positionStart - 1, Payload.UpdateDivider)
+					}
+					
+					/* for remove placeholder */
+					if (layer.model.size == itemCount && layer.placeholderProvider != null)
+					{
+						notifyItemRemoved(positionStart)
+					}
 				}
 				reorder()
+			}
+			
+			override fun onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int)
+			{
+				TODO("divider 갱신 처리: drag and drop 구현 시 같이 구현")
 			}
 		})
 	}
@@ -295,7 +401,7 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 		layerOrder += group
 		layerPosition[count] = group
 		layerArrayForViewType += group
-		group.model.agent = this
+		group.model.adapter = this
 		group.model.adapterPosition = count
 		count += group.size
 	}
@@ -322,54 +428,81 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 	private fun Int.isNormalViewType(): Boolean = this and 0x40000000 == 0
 	private fun Int.isPlaceholderViewType(): Boolean = this and 0x40000000 != 0
 	
-	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NemoRecyclerView.ViewHolder
-	{
-		return layerOfViewType(viewType).let { layer ->
-			when (layer)
+	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = layerOfViewType(viewType).let { layer ->
+		when (layer)
+		{
+			is Group ->
 			{
-				is Group ->
+				when
 				{
-					when
+					viewType.isNormalViewType() ->
 					{
-						viewType.isNormalViewType() ->
-						{
-							layer.viewProvider(LayoutInflater.from(parent.context), parent, false)
-						}
-						layer.placeholderProvider != null ->
-						{
-							layer.placeholderProvider.invoke(LayoutInflater.from(parent.context), parent, false)
-						}
-						else ->
-						{
-							TODO("예외 던지기")
+						layer.viewProvider(LayoutInflater.from(parent.context), parent, false).also { binding ->
+							if (layer.divider != null) binding.root.divider = layer.divider
 						}
 					}
+					layer.placeholderProvider != null ->
+					{
+						layer.placeholderProvider.invoke(LayoutInflater.from(parent.context), parent, false).also { binding ->
+							if (layer.divider != null && layer.divider.includePlaceholder) binding.root.divider = layer.divider
+						}
+					}
+					else ->
+					{
+						TODO("예외 던지기")
+					}
 				}
-				is Space -> TODO("not implemented")
 			}
-		}.let { binding ->
-			NemoRecyclerView.ViewHolder(binding)
+			is Space -> TODO("not implemented")
+		}
+	}.let { binding ->
+		NemoRecyclerView.ViewHolder(binding)
+	}
+	
+	override fun onBindViewHolder(holder: NemoRecyclerView.ViewHolder, position: Int) = layerAtPosition(position).let { layer ->
+		when (layer)
+		{
+			is Group ->
+			{
+				val modelPosition = position - layer.model.adapterPosition
+				
+				/* set divider */
+				holder.binding.root.divider?.also { divider ->
+					holder.binding.root.divider = divider.copy(
+							isFirst = modelPosition == 0,
+							isLast = modelPosition == layer.lastIndex)
+				}
+				
+				/* callback */
+				if (layer.model.isNotEmpty)
+				{
+					holder.modelPosition = modelPosition
+					layer.onBind(holder, layer.model[modelPosition], holder.binding)
+				}
+				else if (layer.onPlaceHolder != null)
+				{
+					holder.modelPosition = modelPosition /* maybe always 0 */
+					layer.onPlaceHolder.invoke(holder, holder.binding)
+				}
+			}
+			is Space -> TODO("not implemented")
 		}
 	}
 	
-	override fun onBindViewHolder(holder: NemoRecyclerView.ViewHolder, position: Int)
+	override fun onBindViewHolder(holder: NemoRecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>)
 	{
-		layerAtPosition(position).also { layer ->
-			when (layer)
+		if (payloads.isEmpty()) onBindViewHolder(holder, position)
+		else payloads.forEach { payload ->
+			when (payload)
 			{
-				is Group ->
-				{
-					if (layer.model.isNotEmpty)
-					{
-						holder.modelPosition = position - layer.model.adapterPosition
-						layer.onBind(holder, layer.model[holder.modelPosition], holder.binding)
-					}
-					else if (layer.onPlaceHolder != null)
-					{
-						layer.onPlaceHolder.invoke(holder, holder.binding)
+				is Payload.UpdateDivider -> (layerAtPosition(position) as? Group)?.also { group ->
+					val modelPosition = position - group.model.adapterPosition
+					holder.binding.root.divider?.also { divider ->
+						holder.binding.root.divider = divider.copy(
+								isFirst = modelPosition == 0,
+								isLast = modelPosition == group.lastIndex)
 					}
 				}
-				is Space -> TODO("not implemented")
 			}
 		}
 	}
@@ -450,12 +583,132 @@ private class Agent : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoR
 }
 
 /*###################################################################################################################################
+ * ItemDecoration
+ *###################################################################################################################################*/
+private const val VIEW_TAG_SPACE = 0x0D34A130
+private const val VIEW_TAG_DIVIDER = 0x0D34A131
+
+private var View.divider
+	get() = getTag(VIEW_TAG_DIVIDER) as? Group.Divider
+	set(value) = setTag(VIEW_TAG_DIVIDER, value)
+
+private class SpaceDecoration : RecyclerView.ItemDecoration()
+{
+	@RecyclerView.Orientation
+	var orientation: Int = RecyclerView.VERTICAL
+	
+	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State)
+	{
+		// TODO: 2020-04-01 "not implemented"
+	}
+	
+	override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State)
+	{
+		super.onDraw(c, parent, state)
+		// TODO: 2020-04-01 "not implemented"
+	}
+}
+
+private class DividerDecoration : RecyclerView.ItemDecoration()
+{
+	@RecyclerView.Orientation
+	var orientation: Int = RecyclerView.VERTICAL
+	
+	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = view.divider?.let { divider ->
+		if (orientation == DividerItemDecoration.VERTICAL)
+			outRect.set(0, if (divider.drawBeginning) divider.height else 0, 0, if (divider.drawEnd) divider.height else 0)
+		else
+			outRect.set(if (divider.drawBeginning) divider.width else 0, 0, if (divider.drawEnd) divider.width else 0, 0)
+	} ?: Unit.also {
+		outRect.set(0, 0, 0, 0)
+	}
+	
+	override fun onDraw(canvas: Canvas, parent: RecyclerView, state: RecyclerView.State) = Rect().run {
+		if (parent.layoutManager == null) return
+		
+		fun Group.Divider.draw(itemViewAlpha: Int)
+		{
+			if (!keepAlpha) drawable.alpha = itemViewAlpha
+			drawable.bounds = this@run
+			drawable.draw(canvas)
+		}
+		
+		canvas.save()
+		if (orientation == DividerItemDecoration.VERTICAL)
+		{
+			if (parent.clipToPadding)
+			{
+				left = parent.paddingLeft
+				right = parent.width - parent.paddingRight
+				canvas.clipRect(left, parent.paddingTop, right, parent.height - parent.paddingBottom)
+			}
+			else
+			{
+				left = 0
+				right = parent.width
+			}
+			val bounds = Rect()
+			parent.children.forEach { child ->
+				child.divider?.let { divider ->
+					parent.getDecoratedBoundsWithMargins(child, bounds)
+					if (divider.drawBeginning)
+					{
+						top = bounds.top + if (divider.keepPosition) 0 else child.translationY.roundToInt()
+						bottom = top + divider.height
+						divider.draw((child.alpha * 255).toInt())
+					}
+					if (divider.drawEnd)
+					{
+						bottom = bounds.bottom + if (divider.keepPosition) 0 else child.translationY.roundToInt()
+						top = bottom - divider.height
+						divider.draw((child.alpha * 255).toInt())
+					}
+				}
+			}
+		}
+		else
+		{
+			if (parent.clipToPadding)
+			{
+				top = parent.paddingTop
+				bottom = parent.height - parent.paddingBottom
+				canvas.clipRect(parent.paddingLeft, top, parent.width - parent.paddingRight, bottom)
+			}
+			else
+			{
+				top = 0
+				bottom = parent.height
+			}
+			val bounds = Rect()
+			parent.children.forEach { child ->
+				child.divider?.let { divider ->
+					parent.getDecoratedBoundsWithMargins(child, bounds)
+					if (divider.drawBeginning)
+					{
+						left = bounds.left + if (divider.keepPosition) 0 else child.translationX.roundToInt()
+						right = left + divider.width
+						divider.draw((child.alpha * 255).toInt())
+					}
+					if (divider.drawEnd)
+					{
+						right = bounds.right + if (divider.keepPosition) 0 else child.translationX.roundToInt()
+						left = right - divider.width
+						divider.draw((child.alpha * 255).toInt())
+					}
+				}
+			}
+		}
+		canvas.restore()
+	}
+}
+
+/*###################################################################################################################################
  * Model
  *###################################################################################################################################*/
 private interface ModelInternal
 {
 	val size: Int
-	var agent: Agent?
+	var adapter: Adapter?
 	var adapterPosition: Int
 	
 	operator fun get(index: Int): Any?
@@ -468,10 +721,16 @@ private val ModelInternal.isEmpty: Boolean
 private val ModelInternal.isNotEmpty: Boolean
 	get() = size > 0
 
+private val ModelInternal.lastIndex: Int
+	get() = size - 1
+
+private val ModelInternal.lastPosition: Int
+	get() = adapterPosition + lastIndex
+
 private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.Singleton<M>
 {
 	override val size: Int = 1
-	override var agent: Agent? = null
+	override var adapter: Adapter? = null
 	override var adapterPosition: Int = 0
 	override var value: M = value
 		set(value)
@@ -479,7 +738,7 @@ private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelI
 			if (field != value)
 			{
 				field = value
-				agent?.notifyItemChanged(adapterPosition)
+				adapter?.notifyItemChanged(adapterPosition)
 			}
 		}
 	
@@ -489,7 +748,7 @@ private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelI
 
 private class ListImpl<M>(private val list: List<M>, private val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.List<M>, List<M> by list
 {
-	override var agent: Agent? = null
+	override var adapter: Adapter? = null
 	override var adapterPosition: Int = 0
 	
 	override fun keyAt(index: Int): Any = this[index].key() ?: index
@@ -501,7 +760,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 	
 	override val size: Int
 		get() = if (estimatedSize >= 0) estimatedSize else list.size
-	override var agent: Agent? = null
+	override var adapter: Adapter? = null
 	override var adapterPosition: Int = 0
 	
 	override fun keyAt(index: Int): Any = this[index].key() ?: index
@@ -510,20 +769,20 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 	{
 		val index = size
 		return list.add(element).alsoIf(true) {
-			agent?.notifyItemInserted(adapterPosition + index)
+			adapter?.notifyItemInserted(adapterPosition + index)
 		}
 	}
 	
 	override fun add(index: Int, element: M)
 	{
 		list.add(index, element)
-		agent?.notifyItemInserted(adapterPosition + index)
+		adapter?.notifyItemInserted(adapterPosition + index)
 	}
 	
 	override fun addAll(index: Int, elements: Collection<M>): Boolean
 	{
 		return list.addAll(index, elements).alsoIf(true) {
-			agent?.notifyItemRangeInserted(adapterPosition + index, elements.size)
+			adapter?.notifyItemRangeInserted(adapterPosition + index, elements.size)
 		}
 	}
 	
@@ -531,7 +790,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 	{
 		val index = size
 		return list.addAll(elements).alsoIf(true) {
-			agent?.notifyItemRangeInserted(adapterPosition + index, elements.size)
+			adapter?.notifyItemRangeInserted(adapterPosition + index, elements.size)
 		}
 	}
 	
@@ -539,14 +798,14 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 	{
 		val count = size
 		list.clear()
-		agent?.notifyItemRangeRemoved(adapterPosition, count)
+		adapter?.notifyItemRangeRemoved(adapterPosition, count)
 	}
 	
 	override fun remove(element: M): Boolean
 	{
 		val index = list.indexOf(element)
 		return list.remove(element).alsoIf(true) {
-			agent?.notifyItemRemoved(adapterPosition + index)
+			adapter?.notifyItemRemoved(adapterPosition + index)
 		}
 	}
 	
@@ -577,7 +836,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 		}
 		return list.removeAll(elements).alsoIf(true) {
 			ranges.forEach { range ->
-				agent?.notifyItemRangeRemoved(range.position, range.count)
+				adapter?.notifyItemRangeRemoved(range.position, range.count)
 			}
 		}
 	}
@@ -585,7 +844,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 	override fun removeAt(index: Int): M
 	{
 		return list.removeAt(index).also {
-			agent?.notifyItemRemoved(adapterPosition + index)
+			adapter?.notifyItemRemoved(adapterPosition + index)
 		}
 	}
 	
@@ -616,7 +875,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 		}
 		return list.retainAll(elements).alsoIf(true) {
 			ranges.forEach { range ->
-				agent?.notifyItemRangeRemoved(range.position, range.count)
+				adapter?.notifyItemRangeRemoved(range.position, range.count)
 			}
 		}
 	}
@@ -626,7 +885,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 		return list.set(index, element).also { prevElement ->
 			if (prevElement != element)
 			{
-				agent?.notifyItemChanged(adapterPosition + index)
+				adapter?.notifyItemChanged(adapterPosition + index)
 			}
 		}
 	}
@@ -653,7 +912,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 			if (isNotEmpty())
 			{
 				forEach { range ->
-					agent?.notifyItemRangeChanged(range.position, range.count)
+					adapter?.notifyItemRangeChanged(range.position, range.count)
 				}
 			}
 			clear()
@@ -693,7 +952,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 				{
 					if (insert.isNotEmpty())
 					{
-						agent?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
+						adapter?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 						lIndex += insert.size
 						insert.clear()
 					}
@@ -706,13 +965,13 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 					change.submit()
 					if (insert.isNotEmpty())
 					{
-						agent?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
+						adapter?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 						lIndex += insert.size
 						lMark += insert.size
 						insert.clear()
 					}
 					val count = lMark - lIndex
-					agent?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
+					adapter?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
 					lRealIndex += count
 					change.update(lIndex, list[lRealIndex], rElement)
 					++lIndex
@@ -723,13 +982,13 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 		change.submit()
 		if (insert.isNotEmpty())
 		{
-			agent?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
+			adapter?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 			lIndex += insert.size
 		}
 		if (lRealIndex < list.size)
 		{
 			val count = list.size - lRealIndex
-			agent?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
+			adapter?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
 		}
 		list.clear()
 		list.addAll(elements)

@@ -118,11 +118,16 @@ class MainActivity : AppCompatActivity()
 					}
 				}
 				group(list, ItemListBinding::inflate) {
+					placeholder(ItemListPlaceholderBinding::inflate)
 					bind { data, binding ->
 						binding.root.setBackgroundColor(Color.parseColor(colors[data.color]))
 						binding.text.text = "${data.key}"
 					}
-					placeholder(ItemListPlaceholderBinding::inflate)
+					divider {
+						sizeDp = 2
+						color = "#FF808080"
+						show = { BEGINNING and MIDDLE and END and INCLUDE_PLACEHOLDER and KEEP_ALPHA and KEEP_POSITION }
+					}
 				}
 				group(NemoRecyclerView.model("null"), ItemFooterBinding::inflate) {
 					/* empty */
