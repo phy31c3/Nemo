@@ -347,25 +347,43 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 		{
 			override fun onChanged() = reorder()
 			override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
-				/* for insert placeholder */
-				if (itemCount > 0
-						&& layer is Group
-						&& layer.model.isEmpty
-						&& layer.placeholderProvider != null)
+				if (itemCount > 0 && layer is Group)
 				{
-					notifyItemInserted(positionStart)
+					if (layer.model.isNotEmpty)
+					{
+						if /* first item removed */ (positionStart == layer.model.adapterPosition)
+						{
+							notifyItemChanged(layer.model.adapterPosition, Payload.UpdateDivider)
+						}
+						/* update last item divider */
+						notifyItemChanged(layer.model.lastPosition, Payload.UpdateDivider)
+					}
+					else if (layer.placeholderProvider != null)
+					{
+						/* for insert placeholder */
+						notifyItemInserted(positionStart)
+					}
 				}
 				reorder()
 			}
 			
 			override fun onItemRangeInserted(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
-				/* for remove placeholder */
-				if (itemCount > 0
-						&& layer is Group
-						&& layer.model.size == itemCount
-						&& layer.placeholderProvider != null)
+				if (itemCount > 0 && layer is Group)
 				{
-					notifyItemRemoved(positionStart)
+					if /* first item inserted */ (positionStart == layer.model.adapterPosition)
+					{
+						notifyItemChanged(layer.model.adapterPosition + itemCount, Payload.UpdateDivider)
+					}
+					if /* last item inserted */ (positionStart + itemCount == layer.model.lastPosition + 1)
+					{
+						notifyItemChanged(positionStart - 1, Payload.UpdateDivider)
+					}
+					
+					/* for remove placeholder */
+					if (layer.model.size == itemCount && layer.placeholderProvider != null)
+					{
+						notifyItemRemoved(positionStart)
+					}
 				}
 				reorder()
 			}
@@ -705,6 +723,9 @@ private val ModelInternal.isNotEmpty: Boolean
 
 private val ModelInternal.lastIndex: Int
 	get() = size - 1
+
+private val ModelInternal.lastPosition: Int
+	get() = adapterPosition + lastIndex
 
 private class SingletonImpl<M>(value: M, private val key: M.() -> Any?) : ModelInternal, NemoRecyclerView.Model.Singleton<M>
 {
