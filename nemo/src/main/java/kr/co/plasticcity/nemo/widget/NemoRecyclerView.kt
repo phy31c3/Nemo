@@ -552,23 +552,26 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 	
 	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = (view.getTag(VIEW_TAG_DIVIDER) as? Group.Divider)?.let { divider ->
 		if (orientation == DividerItemDecoration.VERTICAL)
-			outRect.set(0, 0, 0, divider.height)
+			outRect.set(0, if (divider.drawBeginning) divider.height else 0, 0, if (divider.drawEnd) divider.height else 0)
 		else
-			outRect.set(0, 0, divider.width, 0)
+			outRect.set(if (divider.drawBeginning) divider.width else 0, 0, if (divider.drawEnd) divider.width else 0, 0)
 	} ?: Unit.also {
 		outRect.set(0, 0, 0, 0)
 	}
 	
-	override fun onDraw(canvas: Canvas, parent: RecyclerView, state: RecyclerView.State)
-	{
+	override fun onDraw(canvas: Canvas, parent: RecyclerView, state: RecyclerView.State) = Rect().run {
 		if (parent.layoutManager == null) return
+		
+		fun Group.Divider.draw(itemViewAlpha: Int)
+		{
+			if (!keepAlpha) drawable.alpha = itemViewAlpha
+			drawable.bounds = this@run
+			drawable.draw(canvas)
+		}
 		
 		canvas.save()
 		if (orientation == DividerItemDecoration.VERTICAL)
 		{
-			val left: Int
-			val right: Int
-			val bounds = Rect()
 			if (parent.clipToPadding)
 			{
 				left = parent.paddingLeft
@@ -580,22 +583,27 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 				left = 0
 				right = parent.width
 			}
+			val bounds = Rect()
 			parent.children.forEach { child ->
 				(child.getTag(VIEW_TAG_DIVIDER) as? Group.Divider)?.let { divider ->
 					parent.getDecoratedBoundsWithMargins(child, bounds)
-					val bottom = bounds.bottom + if (divider.keepPosition) 0 else child.translationY.roundToInt()
-					val top = bottom - divider.height
-					if (!divider.keepAlpha) divider.drawable.alpha = (child.alpha * 255).toInt()
-					divider.drawable.setBounds(left, top, right, bottom)
-					divider.drawable.draw(canvas)
+					if (divider.drawBeginning)
+					{
+						top = bounds.top + if (divider.keepPosition) 0 else child.translationY.roundToInt()
+						bottom = top + divider.height
+						divider.draw((child.alpha * 255).toInt())
+					}
+					if (divider.drawEnd)
+					{
+						bottom = bounds.bottom + if (divider.keepPosition) 0 else child.translationY.roundToInt()
+						top = bottom - divider.height
+						divider.draw((child.alpha * 255).toInt())
+					}
 				}
 			}
 		}
 		else
 		{
-			val top: Int
-			val bottom: Int
-			val bounds = Rect()
 			if (parent.clipToPadding)
 			{
 				top = parent.paddingTop
@@ -607,14 +615,22 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 				top = 0
 				bottom = parent.height
 			}
+			val bounds = Rect()
 			parent.children.forEach { child ->
 				(child.getTag(VIEW_TAG_DIVIDER) as? Group.Divider)?.let { divider ->
 					parent.getDecoratedBoundsWithMargins(child, bounds)
-					val right = bounds.right + if (divider.keepPosition) 0 else child.translationX.roundToInt()
-					val left = right - divider.width
-					if (!divider.keepAlpha) divider.drawable.alpha = (child.alpha * 255).toInt()
-					divider.drawable.setBounds(left, top, right, bottom)
-					divider.drawable.draw(canvas)
+					if (divider.drawBeginning)
+					{
+						left = bounds.left + if (divider.keepPosition) 0 else child.translationX.roundToInt()
+						right = left + divider.width
+						divider.draw((child.alpha * 255).toInt())
+					}
+					if (divider.drawEnd)
+					{
+						right = bounds.right + if (divider.keepPosition) 0 else child.translationX.roundToInt()
+						left = right - divider.width
+						divider.draw((child.alpha * 255).toInt())
+					}
 				}
 			}
 		}
