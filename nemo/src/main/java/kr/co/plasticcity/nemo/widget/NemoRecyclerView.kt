@@ -355,8 +355,10 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 						{
 							notifyItemChanged(layer.model.adapterPosition, Payload.UpdateDivider)
 						}
-						/* update last item divider */
-						notifyItemChanged(layer.model.lastPosition, Payload.UpdateDivider)
+						if /* last item removed */ (positionStart > layer.model.lastPosition)
+						{
+							notifyItemChanged(layer.model.lastPosition, Payload.UpdateDivider)
+						}
 					}
 					else if (layer.placeholderProvider != null)
 					{
@@ -374,7 +376,7 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					{
 						notifyItemChanged(layer.model.adapterPosition + itemCount, Payload.UpdateDivider)
 					}
-					if /* last item inserted */ (positionStart + itemCount == layer.model.lastPosition + 1)
+					if /* last item inserted */ (positionStart + itemCount - 1 == layer.model.lastPosition)
 					{
 						notifyItemChanged(positionStart - 1, Payload.UpdateDivider)
 					}
@@ -834,10 +836,14 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 				}
 			}
 		}
+		val oldSize = list.size
 		return list.removeAll(elements).alsoIf(true) {
+			estimatedSize = oldSize
 			ranges.forEach { range ->
+				estimatedSize -= range.count
 				adapter?.notifyItemRangeRemoved(range.position, range.count)
 			}
+			estimatedSize = -1
 		}
 	}
 	
@@ -873,10 +879,14 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 				}
 			}
 		}
+		val oldSize = list.size
 		return list.retainAll(elements).alsoIf(true) {
+			estimatedSize = oldSize
 			ranges.forEach { range ->
+				estimatedSize -= range.count
 				adapter?.notifyItemRangeRemoved(range.position, range.count)
 			}
+			estimatedSize = -1
 		}
 	}
 	
@@ -933,7 +943,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 			}
 		}
 		
-		estimatedSize = elements.size
+		estimatedSize = list.size
 		var lIndex = 0
 		var lRealIndex = 0
 		val change = mutableListOf<Range>()
@@ -952,6 +962,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 				{
 					if (insert.isNotEmpty())
 					{
+						estimatedSize += insert.size
 						adapter?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 						lIndex += insert.size
 						insert.clear()
@@ -965,12 +976,14 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 					change.submit()
 					if (insert.isNotEmpty())
 					{
+						estimatedSize += insert.size
 						adapter?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 						lIndex += insert.size
 						lMark += insert.size
 						insert.clear()
 					}
 					val count = lMark - lIndex
+					estimatedSize -= count
 					adapter?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
 					lRealIndex += count
 					change.update(lIndex, list[lRealIndex], rElement)
@@ -982,12 +995,14 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 		change.submit()
 		if (insert.isNotEmpty())
 		{
+			estimatedSize += insert.size
 			adapter?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 			lIndex += insert.size
 		}
 		if (lRealIndex < list.size)
 		{
 			val count = list.size - lRealIndex
+			estimatedSize -= count
 			adapter?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
 		}
 		list.clear()
