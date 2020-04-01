@@ -390,7 +390,7 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 			
 			override fun onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int)
 			{
-				TODO("divider 갱신 처리")
+				TODO("divider 갱신 처리: drag and drop 구현 시 같이 구현")
 			}
 		})
 	}
