@@ -252,7 +252,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 }
 
 /*###################################################################################################################################
- * Core
+ * Layer
  *###################################################################################################################################*/
 private typealias ViewProvider = (LayoutInflater, ViewGroup, Boolean) -> ViewBinding
 
@@ -301,6 +301,26 @@ private sealed class Layer(val tag: Any)
 	}
 }
 
+private val Layer.isEmpty: Boolean
+	get() = size == 0
+
+private val Layer.isNotEmpty: Boolean
+	get() = size > 0
+
+private val Layer.lastIndex: Int
+	get() = size - 1
+
+/*###################################################################################################################################
+ * Payload
+ *###################################################################################################################################*/
+private sealed class Payload
+{
+	object UpdateDivider : Payload()
+}
+
+/*###################################################################################################################################
+ * Adapter
+ *###################################################################################################################################*/
 private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), NemoRecyclerView.GroupArrange
 {
 	companion object
@@ -327,6 +347,7 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 		{
 			override fun onChanged() = reorder()
 			override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
+				/* for insert placeholder */
 				if (itemCount > 0
 						&& layer is Group
 						&& layer.model.isEmpty
@@ -338,6 +359,7 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 			}
 			
 			override fun onItemRangeInserted(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
+				/* for remove placeholder */
 				if (itemCount > 0
 						&& layer is Group
 						&& layer.model.size == itemCount
@@ -346,6 +368,11 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					notifyItemRemoved(positionStart)
 				}
 				reorder()
+			}
+			
+			override fun onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int)
+			{
+				TODO("divider 갱신 처리")
 			}
 		})
 	}
@@ -393,13 +420,13 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					viewType.isNormalViewType() ->
 					{
 						layer.viewProvider(LayoutInflater.from(parent.context), parent, false).also { binding ->
-							if (layer.divider != null) binding.root.setTag(VIEW_TAG_DIVIDER, layer.divider)
+							if (layer.divider != null) binding.root.divider = layer.divider
 						}
 					}
 					layer.placeholderProvider != null ->
 					{
 						layer.placeholderProvider.invoke(LayoutInflater.from(parent.context), parent, false).also { binding ->
-							if (layer.divider != null && layer.divider.includePlaceholder) binding.root.setTag(VIEW_TAG_DIVIDER, layer.divider)
+							if (layer.divider != null && layer.divider.includePlaceholder) binding.root.divider = layer.divider
 						}
 					}
 					else ->
@@ -422,13 +449,10 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 				val modelPosition = position - layer.model.adapterPosition
 				
 				/* set divider */
-				holder.binding.root.getTag(VIEW_TAG_DIVIDER)?.also { divider ->
-					divider as Group.Divider
-					holder.binding.root.setTag(VIEW_TAG_DIVIDER,
-							divider.copy(
-									isFirst = modelPosition == 0,
-									isLast = modelPosition == layer.model.lastIndex)
-					)
+				holder.binding.root.divider?.also { divider ->
+					holder.binding.root.divider = divider.copy(
+							isFirst = modelPosition == 0,
+							isLast = modelPosition == layer.lastIndex)
 				}
 				
 				/* callback */
@@ -444,6 +468,24 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 				}
 			}
 			is Space -> TODO("not implemented")
+		}
+	}
+	
+	override fun onBindViewHolder(holder: NemoRecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>)
+	{
+		if (payloads.isEmpty()) onBindViewHolder(holder, position)
+		else payloads.forEach { payload ->
+			when (payload)
+			{
+				is Payload.UpdateDivider -> (layerAtPosition(position) as? Group)?.also { group ->
+					val modelPosition = position - group.model.adapterPosition
+					holder.binding.root.divider?.also { divider ->
+						holder.binding.root.divider = divider.copy(
+								isFirst = modelPosition == 0,
+								isLast = modelPosition == group.lastIndex)
+					}
+				}
+			}
 		}
 	}
 	
@@ -528,6 +570,10 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 private const val VIEW_TAG_SPACE = 0x0D34A130
 private const val VIEW_TAG_DIVIDER = 0x0D34A131
 
+private var View.divider
+	get() = getTag(VIEW_TAG_DIVIDER) as? Group.Divider
+	set(value) = setTag(VIEW_TAG_DIVIDER, value)
+
 private class SpaceDecoration : RecyclerView.ItemDecoration()
 {
 	@RecyclerView.Orientation
@@ -550,7 +596,7 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 	@RecyclerView.Orientation
 	var orientation: Int = RecyclerView.VERTICAL
 	
-	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = (view.getTag(VIEW_TAG_DIVIDER) as? Group.Divider)?.let { divider ->
+	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = view.divider?.let { divider ->
 		if (orientation == DividerItemDecoration.VERTICAL)
 			outRect.set(0, if (divider.drawBeginning) divider.height else 0, 0, if (divider.drawEnd) divider.height else 0)
 		else
@@ -585,7 +631,7 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 			}
 			val bounds = Rect()
 			parent.children.forEach { child ->
-				(child.getTag(VIEW_TAG_DIVIDER) as? Group.Divider)?.let { divider ->
+				child.divider?.let { divider ->
 					parent.getDecoratedBoundsWithMargins(child, bounds)
 					if (divider.drawBeginning)
 					{
@@ -617,7 +663,7 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 			}
 			val bounds = Rect()
 			parent.children.forEach { child ->
-				(child.getTag(VIEW_TAG_DIVIDER) as? Group.Divider)?.let { divider ->
+				child.divider?.let { divider ->
 					parent.getDecoratedBoundsWithMargins(child, bounds)
 					if (divider.drawBeginning)
 					{
