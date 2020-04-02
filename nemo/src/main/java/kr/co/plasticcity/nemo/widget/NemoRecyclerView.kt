@@ -168,7 +168,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			{
 				var onBind: ViewHolder.(Any?, ViewBinding) -> Unit = { _, _ -> }
 				var placeholderProvider: ViewProvider? = null
-				var onPlaceHolder: (ViewHolder.(ViewBinding) -> Unit)? = null
+				var onPlaceholder: (ViewHolder.(ViewBinding) -> Unit)? = null
 				var divider: Group.Divider? = null
 				
 				override var allowDragAndDrop: Boolean
@@ -187,7 +187,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				override fun <PH : ViewBinding> placeholder(view: (LayoutInflater, ViewGroup, Boolean) -> PH, block: (ViewHolder.(binding: PH) -> Unit)?)
 				{
 					placeholderProvider = view
-					onPlaceHolder = block as? ViewHolder.(ViewBinding) -> Unit
+					onPlaceholder = block as? ViewHolder.(ViewBinding) -> Unit
 				}
 				
 				override fun divider(block: DividerDefine.() -> Unit) = object : DividerDefine
@@ -220,7 +220,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 						viewProvider = view,
 						onBind = onBind,
 						placeholderProvider = placeholderProvider,
-						onPlaceHolder = onPlaceHolder,
+						onPlaceholder = onPlaceholder,
 						divider = divider)
 				)
 			}
@@ -232,8 +232,21 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				override var color: String = "#00000000"
 				override var colorRes: Int = 0
 				override var drawableRes: Int = 0
-			}.run {
-				block()
+			}.let {
+				block(it)
+				when
+				{
+					it.drawableRes != 0 -> context.getDrawable(it.drawableRes)
+					it.colorRes != 0 -> ColorDrawable(context.getColor(it.colorRes))
+					else -> ColorDrawable(Color.parseColor(it.color))
+				}.let { drawable ->
+					adapter.add(Space(
+							tag = tag,
+							minSizePx = it.minSizeDp.toPx(),
+							sizeWeight = it.sizeWeight,
+							drawable = drawable)
+					)
+				}
 			}
 		}.apply {
 			block()
@@ -259,7 +272,7 @@ private sealed class Layer(val tag: Any)
 	            val viewProvider: ViewProvider,
 	            val onBind: NemoRecyclerView.ViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
 	            val placeholderProvider: ViewProvider?,
-	            val onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)?,
+	            val onPlaceholder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)?,
 	            val divider: Divider?
 	) : Layer(tag)
 	{
@@ -289,7 +302,11 @@ private sealed class Layer(val tag: Any)
 		}
 	}
 	
-	class Space(tag: Any) : Layer(tag)
+	class Space(tag: Any,
+	            val minSizePx: Int,
+	            val sizeWeight: Double,
+	            val drawable: Drawable
+	) : Layer(tag)
 	{
 		override val size: Int = 1
 	}
@@ -402,6 +419,15 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 		count += group.size
 	}
 	
+	fun add(space: Space)
+	{
+		layers[space.tag] = space
+		layerOrder += space
+		layerPosition[count] = space
+		layerArrayForViewType += space
+		count += space.size
+	}
+	
 	private fun reorder()
 	{
 		count = 0
@@ -475,10 +501,10 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					holder.modelPosition = modelPosition
 					layer.onBind(holder, layer.model[modelPosition], holder.binding)
 				}
-				else if (layer.onPlaceHolder != null)
+				else if (layer.onPlaceholder != null)
 				{
 					holder.modelPosition = modelPosition /* maybe always 0 */
-					layer.onPlaceHolder.invoke(holder, holder.binding)
+					layer.onPlaceholder.invoke(holder, holder.binding)
 				}
 			}
 			is Space -> TODO("not implemented")
