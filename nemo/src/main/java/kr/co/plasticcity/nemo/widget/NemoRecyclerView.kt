@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import kr.co.plasticcity.nemo.alsoIf
+import kr.co.plasticcity.nemo.databinding.NemoRecyclerViewSpaceBinding
 import kr.co.plasticcity.nemo.toPx
 import kr.co.plasticcity.nemo.widget.Layer.Group
 import kr.co.plasticcity.nemo.widget.Layer.Space
@@ -27,13 +28,13 @@ import kotlin.math.roundToInt
 
 class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr)
 {
-	private val spaceDecoration: SpaceDecoration = SpaceDecoration()
 	private val dividerDecoration: DividerDecoration = DividerDecoration()
+	private val spaceDecoration: SpaceDecoration = SpaceDecoration()
 	
 	init
 	{
-		addItemDecoration(spaceDecoration)
 		addItemDecoration(dividerDecoration)
+		addItemDecoration(spaceDecoration)
 	}
 	
 	@DslMarker
@@ -112,12 +113,12 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 	interface SpaceDefine
 	{
 		var minSizeDp: Int
-		var sizeWeight: Double
+		var weight: Double?
 		
 		/**
 		 * ex) "#FFFFFFFF"
 		 */
-		var color: String
+		var color: String?
 		var colorRes: Int
 		var drawableRes: Int
 	}
@@ -214,22 +215,22 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				}
 			}.run {
 				block()
-				adapter.add(Group(
+				adapter += Group(
 						tag = tag,
 						model = model as ModelInternal,
 						viewProvider = view,
 						onBind = onBind,
 						placeholderProvider = placeholderProvider,
 						onPlaceholder = onPlaceholder,
-						divider = divider)
+						divider = divider
 				)
 			}
 			
 			override fun space(block: SpaceDefine.() -> Unit) = object : SpaceDefine
 			{
 				override var minSizeDp: Int = 0
-				override var sizeWeight: Double = -1.0
-				override var color: String = "#00000000"
+				override var weight: Double? = null
+				override var color: String? = null
 				override var colorRes: Int = 0
 				override var drawableRes: Int = 0
 			}.let {
@@ -238,20 +239,24 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				{
 					it.drawableRes != 0 -> context.getDrawable(it.drawableRes)
 					it.colorRes != 0 -> ColorDrawable(context.getColor(it.colorRes))
-					else -> ColorDrawable(Color.parseColor(it.color))
+					it.color != null -> ColorDrawable(Color.parseColor(it.color))
+					else -> null
 				}.let { drawable ->
-					adapter.add(Space(
+					Space(
 							tag = tag,
 							minSizePx = it.minSizeDp.toPx(),
-							sizeWeight = it.sizeWeight,
-							drawable = drawable)
+							weight = it.weight,
+							drawable = drawable
 					)
 				}
+			}.let { space ->
+				spaceDecoration += space
+				adapter += space
 			}
 		}.apply {
-			block()
-			spaceDecoration.orientation = orientation
 			dividerDecoration.orientation = orientation
+			spaceDecoration.orientation = orientation
+			block()
 			this@NemoRecyclerView.layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
 			this@NemoRecyclerView.adapter = adapter
 		}
@@ -304,8 +309,8 @@ private sealed class Layer(val tag: Any)
 	
 	class Space(tag: Any,
 	            val minSizePx: Int,
-	            val sizeWeight: Double,
-	            val drawable: Drawable
+	            val weight: Double?,
+	            val drawable: Drawable?
 	) : Layer(tag)
 	{
 		override val size: Int = 1
@@ -408,7 +413,7 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 		})
 	}
 	
-	fun add(group: Group)
+	operator fun plusAssign(group: Group)
 	{
 		layers[group.tag] = group
 		layerOrder += group
@@ -419,7 +424,7 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 		count += group.size
 	}
 	
-	fun add(space: Space)
+	operator fun plusAssign(space: Space)
 	{
 		layers[space.tag] = space
 		layerOrder += space
@@ -475,39 +480,40 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					}
 				}
 			}
-			is Space -> TODO("not implemented")
+			is Space ->
+			{
+				NemoRecyclerViewSpaceBinding.inflate(LayoutInflater.from(parent.context), parent, false).also { binding ->
+					binding.root.space = layer
+				}
+			}
 		}
 	}.let { binding ->
 		NemoRecyclerView.ViewHolder(binding)
 	}
 	
 	override fun onBindViewHolder(holder: NemoRecyclerView.ViewHolder, position: Int) = layerAtPosition(position).let { layer ->
-		when (layer)
+		if (layer is Group)
 		{
-			is Group ->
-			{
-				val modelPosition = position - layer.model.adapterPosition
-				
-				/* set divider */
-				holder.binding.root.divider?.also { divider ->
-					holder.binding.root.divider = divider.copy(
-							isFirst = modelPosition == 0,
-							isLast = modelPosition == layer.lastIndex)
-				}
-				
-				/* callback */
-				if (layer.model.isNotEmpty)
-				{
-					holder.modelPosition = modelPosition
-					layer.onBind(holder, layer.model[modelPosition], holder.binding)
-				}
-				else if (layer.onPlaceholder != null)
-				{
-					holder.modelPosition = modelPosition /* maybe always 0 */
-					layer.onPlaceholder.invoke(holder, holder.binding)
-				}
+			val modelPosition = position - layer.model.adapterPosition
+			
+			/* set divider */
+			holder.binding.root.divider?.also { divider ->
+				holder.binding.root.divider = divider.copy(
+						isFirst = modelPosition == 0,
+						isLast = modelPosition == layer.lastIndex)
 			}
-			is Space -> TODO("not implemented")
+			
+			/* callback */
+			if (layer.model.isNotEmpty)
+			{
+				holder.modelPosition = modelPosition
+				layer.onBind(holder, layer.model[modelPosition], holder.binding)
+			}
+			else if (layer.onPlaceholder != null)
+			{
+				holder.modelPosition = modelPosition /* maybe always 0 */
+				layer.onPlaceholder.invoke(holder, holder.binding)
+			}
 		}
 	}
 	
@@ -614,20 +620,35 @@ private var View.divider
 	get() = getTag(VIEW_TAG_DIVIDER) as? Group.Divider
 	set(value) = setTag(VIEW_TAG_DIVIDER, value)
 
+private var View.space
+	get() = getTag(VIEW_TAG_SPACE) as? Space
+	set(value) = setTag(VIEW_TAG_SPACE, value)
+
 private class SpaceDecoration : RecyclerView.ItemDecoration()
 {
 	@RecyclerView.Orientation
 	var orientation: Int = RecyclerView.VERTICAL
+		set(value)
+		{
+			field = value
+			weightSum = 0.0
+		}
 	
-	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State)
+	private var weightSum: Double = 0.0
+	
+	operator fun plusAssign(space: Space)
 	{
-		// TODO: 2020-04-01 "not implemented"
+		weightSum += space.weight ?: 0.0
 	}
 	
-	override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State)
-	{
-		super.onDraw(c, parent, state)
-		// TODO: 2020-04-01 "not implemented"
+	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = view.space?.let { space ->
+		TODO("not implemented")
+	} ?: Unit.also {
+		outRect.set(0, 0, 0, 0)
+	}
+	
+	override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State) = Rect().run {
+		TODO("not implemented")
 	}
 }
 
