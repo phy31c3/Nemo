@@ -14,7 +14,6 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.collection.ArraySet
 import androidx.core.view.children
-import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
@@ -624,25 +623,61 @@ private var View.space
 	get() = getTag(VIEW_TAG_SPACE) as? Space
 	set(value) = setTag(VIEW_TAG_SPACE, value)
 
+private val View.hasSpace
+	get() = getTag(VIEW_TAG_SPACE) as? Space != null
+
 private class SpaceDecoration : RecyclerView.ItemDecoration()
 {
+	private class Cache
+	
+	private val spaces = mutableListOf<Space>()
+	private var cache: Cache? = null
+	private var minSizeSum: Int = 0
+	private var weightSum: Double = 0.0
+	
 	@RecyclerView.Orientation
 	var orientation: Int = RecyclerView.VERTICAL
 		set(value)
 		{
 			field = value
+			minSizeSum = 0
 			weightSum = 0.0
 		}
 	
-	private var weightSum: Double = 0.0
-	
 	operator fun plusAssign(space: Space)
 	{
+		spaces += space
+		minSizeSum += space.minSizePx
 		weightSum += space.weight ?: 0.0
 	}
 	
 	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = view.space?.let { space ->
-		TODO("not implemented")
+		if (orientation == RecyclerView.VERTICAL)
+		{
+			val bounds = Rect()
+			parent.children.sumBy { child ->
+				if (!child.hasSpace)
+				{
+					parent.getDecoratedBoundsWithMargins(child, bounds)
+					bounds.bottom - bounds.top
+				}
+				else 0
+			}.let { heightSum ->
+				if (heightSum + minSizeSum >= parent.height)
+				{
+					outRect.set(0, space.minSizePx, 0, 0)
+				}
+				else
+				{
+					val margin = parent.height - heightSum
+					TODO("계속 구현")
+				}
+			}
+		}
+		else  /* orientation == RecyclerView.HORIZONTAL) */
+		{
+			TODO("not implemented")
+		}
 	} ?: Unit.also {
 		outRect.set(0, 0, 0, 0)
 	}
@@ -658,9 +693,9 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 	var orientation: Int = RecyclerView.VERTICAL
 	
 	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = view.divider?.let { divider ->
-		if (orientation == DividerItemDecoration.VERTICAL)
+		if (orientation == RecyclerView.VERTICAL)
 			outRect.set(0, if (divider.drawBeginning) divider.height else 0, 0, if (divider.drawEnd) divider.height else 0)
-		else
+		else  /* orientation == RecyclerView.HORIZONTAL) */
 			outRect.set(if (divider.drawBeginning) divider.width else 0, 0, if (divider.drawEnd) divider.width else 0, 0)
 	} ?: Unit.also {
 		outRect.set(0, 0, 0, 0)
@@ -677,7 +712,7 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 		}
 		
 		canvas.save()
-		if (orientation == DividerItemDecoration.VERTICAL)
+		if (orientation == RecyclerView.VERTICAL)
 		{
 			if (parent.clipToPadding)
 			{
@@ -709,7 +744,7 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 				}
 			}
 		}
-		else
+		else /* orientation == RecyclerView.HORIZONTAL) */
 		{
 			if (parent.clipToPadding)
 			{
