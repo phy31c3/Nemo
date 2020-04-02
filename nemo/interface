@@ -20,11 +20,11 @@ val groups = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout
         }
     }
     space {
-        sizeDp = 100
+        minSizeDp = 100
+        sizeWeight = 1.0
         color = "#ff00ff00"
         colorRes = R.color.divider
-        fillViewport = true
-        fillWeight = 1
+        drawableRes = R.drawable.divider
     }
     group("list", model = accounts, view = HeaderItemBinding::inflate) {
 		allowDragAndDrop = false

@@ -111,11 +111,15 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 	@Marker
 	interface SpaceDefine
 	{
-		var sizeDp: Int
+		var minSizeDp: Int
+		var sizeWeight: Double
+		
+		/**
+		 * ex) "#FFFFFFFF"
+		 */
 		var color: String
 		var colorRes: Int
-		var fillViewport: Boolean
-		var fillWeight: Float
+		var drawableRes: Int
 	}
 	
 	interface GroupArrange
@@ -223,21 +227,11 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			
 			override fun space(block: SpaceDefine.() -> Unit) = object : SpaceDefine
 			{
-				override var sizeDp: Int
-					get() = TODO("not implemented")
-					set(value) = TODO("not implemented")
-				override var color: String
-					get() = TODO("not implemented")
-					set(value) = TODO("not implemented")
-				override var colorRes: Int
-					get() = TODO("not implemented")
-					set(value) = TODO("not implemented")
-				override var fillViewport: Boolean
-					get() = TODO("not implemented")
-					set(value) = TODO("not implemented")
-				override var fillWeight: Float
-					get() = TODO("not implemented")
-					set(value) = TODO("not implemented")
+				override var minSizeDp: Int = 0
+				override var sizeWeight: Double = -1.0
+				override var color: String = "#00000000"
+				override var colorRes: Int = 0
+				override var drawableRes: Int = 0
 			}.run {
 				block()
 			}
