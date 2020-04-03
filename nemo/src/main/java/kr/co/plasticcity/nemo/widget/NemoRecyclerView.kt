@@ -112,7 +112,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 	interface SpaceDefine
 	{
 		var minSizeDp: Int
-		var weight: Double?
+		var fillWeight: Double?
 		
 		/**
 		 * ex) "#FFFFFFFF"
@@ -228,7 +228,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			override fun space(block: SpaceDefine.() -> Unit) = object : SpaceDefine
 			{
 				override var minSizeDp: Int = 0
-				override var weight: Double? = null
+				override var fillWeight: Double? = null
 				override var color: String? = null
 				override var colorRes: Int = 0
 				override var drawableRes: Int = 0
@@ -244,7 +244,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 					Space(
 							tag = tag,
 							minSizePx = it.minSizeDp.toPx(),
-							weight = it.weight,
+							fillWeight = it.fillWeight,
 							drawable = drawable
 					)
 				}
@@ -308,7 +308,7 @@ private sealed class Layer(val tag: Any)
 	
 	class Space(tag: Any,
 	            val minSizePx: Int,
-	            val weight: Double?,
+	            val fillWeight: Double?,
 	            val drawable: Drawable?
 	) : Layer(tag)
 	{
@@ -768,7 +768,7 @@ private class SpaceDecoration : RecyclerView.ItemDecoration()
 	{
 		measure += space
 		minSizeSum += space.minSizePx
-		weightSum += space.weight ?: 0.0
+		weightSum += space.fillWeight ?: 0.0
 	}
 	
 	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = view.space?.let { space ->
