@@ -626,67 +626,6 @@ private var View.space
 private val View.hasSpace
 	get() = getTag(VIEW_TAG_SPACE) as? Space != null
 
-private class SpaceDecoration : RecyclerView.ItemDecoration()
-{
-	private class Cache
-	
-	private val spaces = mutableListOf<Space>()
-	private var cache: Cache? = null
-	private var minSizeSum: Int = 0
-	private var weightSum: Double = 0.0
-	
-	@RecyclerView.Orientation
-	var orientation: Int = RecyclerView.VERTICAL
-		set(value)
-		{
-			field = value
-			minSizeSum = 0
-			weightSum = 0.0
-		}
-	
-	operator fun plusAssign(space: Space)
-	{
-		spaces += space
-		minSizeSum += space.minSizePx
-		weightSum += space.weight ?: 0.0
-	}
-	
-	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = view.space?.let { space ->
-		if (orientation == RecyclerView.VERTICAL)
-		{
-			val bounds = Rect()
-			parent.children.sumBy { child ->
-				if (!child.hasSpace)
-				{
-					parent.getDecoratedBoundsWithMargins(child, bounds)
-					bounds.bottom - bounds.top
-				}
-				else 0
-			}.let { heightSum ->
-				if (heightSum + minSizeSum >= parent.height)
-				{
-					outRect.set(0, space.minSizePx, 0, 0)
-				}
-				else
-				{
-					val margin = parent.height - heightSum
-					TODO("계속 구현")
-				}
-			}
-		}
-		else  /* orientation == RecyclerView.HORIZONTAL) */
-		{
-			TODO("not implemented")
-		}
-	} ?: Unit.also {
-		outRect.set(0, 0, 0, 0)
-	}
-	
-	override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State) = Rect().run {
-		TODO("not implemented")
-	}
-}
-
 private class DividerDecoration : RecyclerView.ItemDecoration()
 {
 	@RecyclerView.Orientation
@@ -773,6 +712,170 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 						left = right - divider.width
 						divider.draw((child.alpha * 255).toInt())
 					}
+				}
+			}
+		}
+		canvas.restore()
+	}
+}
+
+private class SpaceDecoration : RecyclerView.ItemDecoration()
+{
+	private class Measure
+	{
+		private val cache = mutableMapOf<Space, Int>()
+		
+		val isEmpty
+			get() = cache.isEmpty()
+		
+		var margin = 0
+			private set
+		
+		operator fun get(space: Space): Int = cache[space]!!
+		operator fun plusAssign(space: Space)
+		{
+			cache += space to space.minSizePx
+		}
+		
+		fun calculate(margin: Int)
+		{
+			this.margin = margin
+			TODO("not implemented")
+		}
+		
+		fun clear()
+		{
+			cache.clear()
+			margin = 0
+		}
+	}
+	
+	private val measure = Measure()
+	private var minSizeSum: Int = 0
+	private var weightSum: Double = 0.0
+	
+	@RecyclerView.Orientation
+	var orientation: Int = RecyclerView.VERTICAL
+		set(value)
+		{
+			field = value
+			measure.clear()
+			minSizeSum = 0
+			weightSum = 0.0
+		}
+	
+	operator fun plusAssign(space: Space)
+	{
+		measure += space
+		minSizeSum += space.minSizePx
+		weightSum += space.weight ?: 0.0
+	}
+	
+	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = view.space?.let { space ->
+		if (orientation == RecyclerView.VERTICAL)
+		{
+			val bounds = Rect()
+			parent.children.sumBy { child ->
+				if (!child.hasSpace)
+				{
+					parent.getDecoratedBoundsWithMargins(child, bounds)
+					bounds.bottom - bounds.top
+				}
+				else 0
+			}.let { sizeSum ->
+				if (sizeSum + minSizeSum >= parent.height)
+				{
+					outRect.set(0, space.minSizePx / 2, 0, space.minSizePx / 2)
+				}
+				else
+				{
+					val margin = parent.height - sizeSum
+					if (margin != measure.margin) measure.calculate(margin)
+					outRect.set(0, measure[space] / 2, 0, measure[space] / 2)
+				}
+			}
+		}
+		else  /* orientation == RecyclerView.HORIZONTAL) */
+		{
+			val bounds = Rect()
+			parent.children.sumBy { child ->
+				if (!child.hasSpace)
+				{
+					parent.getDecoratedBoundsWithMargins(child, bounds)
+					bounds.right - bounds.left
+				}
+				else 0
+			}.let { sizeSum ->
+				if (sizeSum + minSizeSum >= parent.width)
+				{
+					outRect.set(space.minSizePx / 2, 0, space.minSizePx / 2, 0)
+				}
+				else
+				{
+					val margin = parent.width - sizeSum
+					if (margin != measure.margin) measure.calculate(margin)
+					outRect.set(measure[space] / 2, 0, measure[space] / 2, 0)
+				}
+			}
+		}
+	} ?: Unit.also {
+		outRect.set(0, 0, 0, 0)
+	}
+	
+	override fun onDraw(canvas: Canvas, parent: RecyclerView, state: RecyclerView.State) = Rect().run {
+		if (parent.layoutManager == null || measure.isEmpty) return
+		
+		fun Space.draw(itemViewAlpha: Int)
+		{
+			drawable?.alpha = itemViewAlpha
+			drawable?.bounds = this@run
+			drawable?.draw(canvas)
+		}
+		
+		canvas.save()
+		if (orientation == RecyclerView.VERTICAL)
+		{
+			if (parent.clipToPadding)
+			{
+				left = parent.paddingLeft
+				right = parent.width - parent.paddingRight
+				canvas.clipRect(left, parent.paddingTop, right, parent.height - parent.paddingBottom)
+			}
+			else
+			{
+				left = 0
+				right = parent.width
+			}
+			val bounds = Rect()
+			parent.children.forEach { child ->
+				child.space?.let { space ->
+					parent.getDecoratedBoundsWithMargins(child, bounds)
+					top = bounds.top + child.translationY.roundToInt()
+					bottom = top + bounds.height()
+					space.draw((child.alpha * 255).toInt())
+				}
+			}
+		}
+		else /* orientation == RecyclerView.HORIZONTAL) */
+		{
+			if (parent.clipToPadding)
+			{
+				top = parent.paddingTop
+				bottom = parent.height - parent.paddingBottom
+				canvas.clipRect(parent.paddingLeft, top, parent.width - parent.paddingRight, bottom)
+			}
+			else
+			{
+				top = 0
+				bottom = parent.height
+			}
+			val bounds = Rect()
+			parent.children.forEach { child ->
+				child.space?.let { space ->
+					parent.getDecoratedBoundsWithMargins(child, bounds)
+					left = bounds.left + child.translationX.roundToInt()
+					right = left + bounds.width()
+					space.draw((child.alpha * 255).toInt())
 				}
 			}
 		}
