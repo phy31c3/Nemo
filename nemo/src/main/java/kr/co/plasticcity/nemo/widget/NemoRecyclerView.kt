@@ -14,30 +14,33 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.collection.ArraySet
 import androidx.core.view.children
-import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import kr.co.plasticcity.nemo.alsoIf
 import kr.co.plasticcity.nemo.toPx
 import kr.co.plasticcity.nemo.widget.Layer.Group
-import kr.co.plasticcity.nemo.widget.Layer.Space
 import java.util.*
 import kotlin.math.roundToInt
 
 class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr)
 {
-	private val spaceDecoration: SpaceDecoration = SpaceDecoration()
 	private val dividerDecoration: DividerDecoration = DividerDecoration()
 	
 	init
 	{
-		addItemDecoration(spaceDecoration)
 		addItemDecoration(dividerDecoration)
 	}
 	
 	@DslMarker
 	private annotation class Marker
+	
+	@Marker
+	class ViewHolder(internal val binding: ViewBinding) : RecyclerView.ViewHolder(binding.root)
+	{
+		var modelPosition: Int = 0
+			internal set
+	}
 	
 	@Marker
 	interface Define
@@ -56,8 +59,6 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				view: (LayoutInflater, ViewGroup, Boolean) -> V,
 				tag: Any = Any(),
 				block: GroupDefine<M, V>.() -> Unit)
-		
-		fun space(block: SpaceDefine.() -> Unit)
 	}
 	
 	@Marker
@@ -74,13 +75,6 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 		var allowSwipeToDismiss: Boolean
 		
 		fun <PH : ViewBinding> placeholder(view: (LayoutInflater, ViewGroup, Boolean) -> PH, block: (ViewHolder.(binding: PH) -> Unit)? = null)
-	}
-	
-	@Marker
-	class ViewHolder(internal val binding: ViewBinding) : RecyclerView.ViewHolder(binding.root)
-	{
-		var modelPosition: Int = 0
-			internal set
 	}
 	
 	@Marker
@@ -106,16 +100,6 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			const val KEEP_ALPHA = -0x00000011
 			const val KEEP_POSITION = -0x00000021
 		}
-	}
-	
-	@Marker
-	interface SpaceDefine
-	{
-		var sizeDp: Int
-		var color: String
-		var colorRes: Int
-		var fillViewport: Boolean
-		var fillWeight: Float
 	}
 	
 	interface GroupArrange
@@ -164,7 +148,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			{
 				var onBind: ViewHolder.(Any?, ViewBinding) -> Unit = { _, _ -> }
 				var placeholderProvider: ViewProvider? = null
-				var onPlaceHolder: (ViewHolder.(ViewBinding) -> Unit)? = null
+				var onPlaceholder: (ViewHolder.(ViewBinding) -> Unit)? = null
 				var divider: Group.Divider? = null
 				
 				override var allowDragAndDrop: Boolean
@@ -183,7 +167,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				override fun <PH : ViewBinding> placeholder(view: (LayoutInflater, ViewGroup, Boolean) -> PH, block: (ViewHolder.(binding: PH) -> Unit)?)
 				{
 					placeholderProvider = view
-					onPlaceHolder = block as? ViewHolder.(ViewBinding) -> Unit
+					onPlaceholder = block as? ViewHolder.(ViewBinding) -> Unit
 				}
 				
 				override fun divider(block: DividerDefine.() -> Unit) = object : DividerDefine
@@ -210,41 +194,19 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				}
 			}.run {
 				block()
-				adapter.add(Group(
+				adapter += Group(
 						tag = tag,
 						model = model as ModelInternal,
 						viewProvider = view,
 						onBind = onBind,
 						placeholderProvider = placeholderProvider,
-						onPlaceHolder = onPlaceHolder,
-						divider = divider)
+						onPlaceholder = onPlaceholder,
+						divider = divider
 				)
 			}
-			
-			override fun space(block: SpaceDefine.() -> Unit) = object : SpaceDefine
-			{
-				override var sizeDp: Int
-					get() = TODO("not implemented")
-					set(value) = TODO("not implemented")
-				override var color: String
-					get() = TODO("not implemented")
-					set(value) = TODO("not implemented")
-				override var colorRes: Int
-					get() = TODO("not implemented")
-					set(value) = TODO("not implemented")
-				override var fillViewport: Boolean
-					get() = TODO("not implemented")
-					set(value) = TODO("not implemented")
-				override var fillWeight: Float
-					get() = TODO("not implemented")
-					set(value) = TODO("not implemented")
-			}.run {
-				block()
-			}
 		}.apply {
-			block()
-			spaceDecoration.orientation = orientation
 			dividerDecoration.orientation = orientation
+			block()
 			this@NemoRecyclerView.layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
 			this@NemoRecyclerView.adapter = adapter
 		}
@@ -265,7 +227,7 @@ private sealed class Layer(val tag: Any)
 	            val viewProvider: ViewProvider,
 	            val onBind: NemoRecyclerView.ViewHolder.(data: Any?, binding: ViewBinding) -> Unit,
 	            val placeholderProvider: ViewProvider?,
-	            val onPlaceHolder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)?,
+	            val onPlaceholder: (NemoRecyclerView.ViewHolder.(binding: ViewBinding) -> Unit)?,
 	            val divider: Divider?
 	) : Layer(tag)
 	{
@@ -293,11 +255,6 @@ private sealed class Layer(val tag: Any)
 			val keepAlpha get() = show and 0x00000010 == 0
 			val keepPosition get() = show and 0x00000020 == 0
 		}
-	}
-	
-	class Space(tag: Any) : Layer(tag)
-	{
-		override val size: Int = 1
 	}
 }
 
@@ -345,7 +302,11 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 		setHasStableIds(true)
 		registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver()
 		{
-			override fun onChanged() = reorder()
+			override fun onChanged()
+			{
+				reorder()
+			}
+			
 			override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
 				if (itemCount > 0 && layer is Group)
 				{
@@ -355,8 +316,10 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 						{
 							notifyItemChanged(layer.model.adapterPosition, Payload.UpdateDivider)
 						}
-						/* update last item divider */
-						notifyItemChanged(layer.model.lastPosition, Payload.UpdateDivider)
+						if /* last item removed */ (positionStart > layer.model.lastPosition)
+						{
+							notifyItemChanged(layer.model.lastPosition, Payload.UpdateDivider)
+						}
 					}
 					else if (layer.placeholderProvider != null)
 					{
@@ -374,11 +337,10 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					{
 						notifyItemChanged(layer.model.adapterPosition + itemCount, Payload.UpdateDivider)
 					}
-					if /* last item inserted */ (positionStart + itemCount == layer.model.lastPosition + 1)
+					if /* last item inserted */ (positionStart + itemCount - 1 == layer.model.lastPosition)
 					{
 						notifyItemChanged(positionStart - 1, Payload.UpdateDivider)
 					}
-					
 					/* for remove placeholder */
 					if (layer.model.size == itemCount && layer.placeholderProvider != null)
 					{
@@ -395,7 +357,7 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 		})
 	}
 	
-	fun add(group: Group)
+	operator fun plusAssign(group: Group)
 	{
 		layers[group.tag] = group
 		layerOrder += group
@@ -453,39 +415,34 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					}
 				}
 			}
-			is Space -> TODO("not implemented")
 		}
 	}.let { binding ->
 		NemoRecyclerView.ViewHolder(binding)
 	}
 	
 	override fun onBindViewHolder(holder: NemoRecyclerView.ViewHolder, position: Int) = layerAtPosition(position).let { layer ->
-		when (layer)
+		if (layer is Group)
 		{
-			is Group ->
-			{
-				val modelPosition = position - layer.model.adapterPosition
-				
-				/* set divider */
-				holder.binding.root.divider?.also { divider ->
-					holder.binding.root.divider = divider.copy(
-							isFirst = modelPosition == 0,
-							isLast = modelPosition == layer.lastIndex)
-				}
-				
-				/* callback */
-				if (layer.model.isNotEmpty)
-				{
-					holder.modelPosition = modelPosition
-					layer.onBind(holder, layer.model[modelPosition], holder.binding)
-				}
-				else if (layer.onPlaceHolder != null)
-				{
-					holder.modelPosition = modelPosition /* maybe always 0 */
-					layer.onPlaceHolder.invoke(holder, holder.binding)
-				}
+			val modelPosition = position - layer.model.adapterPosition
+			
+			/* set divider */
+			holder.binding.root.divider?.also { divider ->
+				holder.binding.root.divider = divider.copy(
+						isFirst = modelPosition == 0,
+						isLast = modelPosition == layer.lastIndex)
 			}
-			is Space -> TODO("not implemented")
+			
+			/* callback */
+			if (layer.model.isNotEmpty)
+			{
+				holder.modelPosition = modelPosition
+				layer.onBind(holder, layer.model[modelPosition], holder.binding)
+			}
+			else if (layer.onPlaceholder != null)
+			{
+				holder.modelPosition = modelPosition /* maybe always 0 */
+				layer.onPlaceholder.invoke(holder, holder.binding)
+			}
 		}
 	}
 	
@@ -516,7 +473,6 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 				if (layer.model.isNotEmpty) layerArrayForViewType.indexOf(layer)
 				else /* placeholder */ layerArrayForViewType.indexOf(layer).toPlaceholderViewType()
 			}
-			is Space -> layerArrayForViewType.indexOf(layer)
 		}
 	}
 	
@@ -535,10 +491,6 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 				{
 					Pair("placeholder", layerArrayForViewType.indexOf(layer).toPlaceholderViewType())
 				}
-			}
-			is Space ->
-			{
-				Pair("space", layerArrayForViewType.indexOf(layer))
 			}
 		}.let { (key, viewType) ->
 			if (key != null)
@@ -585,29 +537,11 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 /*###################################################################################################################################
  * ItemDecoration
  *###################################################################################################################################*/
-private const val VIEW_TAG_SPACE = 0x0D34A130
 private const val VIEW_TAG_DIVIDER = 0x0D34A131
 
 private var View.divider
 	get() = getTag(VIEW_TAG_DIVIDER) as? Group.Divider
 	set(value) = setTag(VIEW_TAG_DIVIDER, value)
-
-private class SpaceDecoration : RecyclerView.ItemDecoration()
-{
-	@RecyclerView.Orientation
-	var orientation: Int = RecyclerView.VERTICAL
-	
-	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State)
-	{
-		// TODO: 2020-04-01 "not implemented"
-	}
-	
-	override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State)
-	{
-		super.onDraw(c, parent, state)
-		// TODO: 2020-04-01 "not implemented"
-	}
-}
 
 private class DividerDecoration : RecyclerView.ItemDecoration()
 {
@@ -615,9 +549,9 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 	var orientation: Int = RecyclerView.VERTICAL
 	
 	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = view.divider?.let { divider ->
-		if (orientation == DividerItemDecoration.VERTICAL)
+		if (orientation == RecyclerView.VERTICAL)
 			outRect.set(0, if (divider.drawBeginning) divider.height else 0, 0, if (divider.drawEnd) divider.height else 0)
-		else
+		else  /* orientation == RecyclerView.HORIZONTAL) */
 			outRect.set(if (divider.drawBeginning) divider.width else 0, 0, if (divider.drawEnd) divider.width else 0, 0)
 	} ?: Unit.also {
 		outRect.set(0, 0, 0, 0)
@@ -634,7 +568,7 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 		}
 		
 		canvas.save()
-		if (orientation == DividerItemDecoration.VERTICAL)
+		if (orientation == RecyclerView.VERTICAL)
 		{
 			if (parent.clipToPadding)
 			{
@@ -666,7 +600,7 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 				}
 			}
 		}
-		else
+		else /* orientation == RecyclerView.HORIZONTAL) */
 		{
 			if (parent.clipToPadding)
 			{
@@ -834,10 +768,14 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 				}
 			}
 		}
+		val oldSize = list.size
 		return list.removeAll(elements).alsoIf(true) {
+			estimatedSize = oldSize
 			ranges.forEach { range ->
+				estimatedSize -= range.count
 				adapter?.notifyItemRangeRemoved(range.position, range.count)
 			}
+			estimatedSize = -1
 		}
 	}
 	
@@ -873,10 +811,14 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 				}
 			}
 		}
+		val oldSize = list.size
 		return list.retainAll(elements).alsoIf(true) {
+			estimatedSize = oldSize
 			ranges.forEach { range ->
+				estimatedSize -= range.count
 				adapter?.notifyItemRangeRemoved(range.position, range.count)
 			}
+			estimatedSize = -1
 		}
 	}
 	
@@ -933,7 +875,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 			}
 		}
 		
-		estimatedSize = elements.size
+		estimatedSize = list.size
 		var lIndex = 0
 		var lRealIndex = 0
 		val change = mutableListOf<Range>()
@@ -952,6 +894,7 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 				{
 					if (insert.isNotEmpty())
 					{
+						estimatedSize += insert.size
 						adapter?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 						lIndex += insert.size
 						insert.clear()
@@ -965,12 +908,14 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 					change.submit()
 					if (insert.isNotEmpty())
 					{
+						estimatedSize += insert.size
 						adapter?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 						lIndex += insert.size
 						lMark += insert.size
 						insert.clear()
 					}
 					val count = lMark - lIndex
+					estimatedSize -= count
 					adapter?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
 					lRealIndex += count
 					change.update(lIndex, list[lRealIndex], rElement)
@@ -982,12 +927,14 @@ private class MutableListImpl<M>(private val list: MutableList<M>, private val k
 		change.submit()
 		if (insert.isNotEmpty())
 		{
+			estimatedSize += insert.size
 			adapter?.notifyItemRangeInserted(adapterPosition + lIndex, insert.size)
 			lIndex += insert.size
 		}
 		if (lRealIndex < list.size)
 		{
 			val count = list.size - lRealIndex
+			estimatedSize -= count
 			adapter?.notifyItemRangeRemoved(adapterPosition + lIndex, count)
 		}
 		list.clear()
