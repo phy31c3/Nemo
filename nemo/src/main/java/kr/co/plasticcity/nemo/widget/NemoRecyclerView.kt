@@ -242,7 +242,6 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 					else -> null
 				}.let { drawable ->
 					Space(
-							tag = tag,
 							minSizePx = it.minSizeDp.toPx(),
 							fillWeight = it.fillWeight,
 							drawable = drawable
@@ -306,11 +305,10 @@ private sealed class Layer(val tag: Any)
 		}
 	}
 	
-	class Space(tag: Any,
-	            val minSizePx: Int,
+	class Space(val minSizePx: Int,
 	            val fillWeight: Double?,
 	            val drawable: Drawable?
-	) : Layer(tag)
+	) : Layer(Any())
 	{
 		override val size: Int = 1
 	}
@@ -331,6 +329,7 @@ private val Layer.lastIndex: Int
 private sealed class Payload
 {
 	object UpdateDivider : Payload()
+	object UpdateSpace : Payload()
 }
 
 /*###################################################################################################################################
@@ -360,7 +359,24 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 		setHasStableIds(true)
 		registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver()
 		{
-			override fun onChanged() = reorder()
+			private fun notifyChangedToAllSpaces() = layerPosition.forEach { (position, layer) ->
+				if (layer is Space) notifyItemChanged(position, Payload.UpdateSpace)
+			}
+			
+			override fun onChanged()
+			{
+				reorder()
+				notifyChangedToAllSpaces()
+			}
+			
+			override fun onItemRangeChanged(positionStart: Int, itemCount: Int, payload: Any?)
+			{
+				if (payload !is Payload.UpdateSpace)
+				{
+					notifyChangedToAllSpaces()
+				}
+			}
+			
 			override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
 				if (itemCount > 0 && layer is Group)
 				{
@@ -382,6 +398,7 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					}
 				}
 				reorder()
+				notifyChangedToAllSpaces()
 			}
 			
 			override fun onItemRangeInserted(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
@@ -395,7 +412,6 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					{
 						notifyItemChanged(positionStart - 1, Payload.UpdateDivider)
 					}
-					
 					/* for remove placeholder */
 					if (layer.model.size == itemCount && layer.placeholderProvider != null)
 					{
@@ -403,6 +419,7 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					}
 				}
 				reorder()
+				notifyChangedToAllSpaces()
 			}
 			
 			override fun onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int)
@@ -723,36 +740,64 @@ private class SpaceDecoration : RecyclerView.ItemDecoration()
 {
 	private class Measure
 	{
-		private val cache = mutableMapOf<Space, Int>()
+		private val result = mutableMapOf<Space, Int>()
 		
 		val isEmpty
-			get() = cache.isEmpty()
+			get() = result.isEmpty()
 		
 		var margin = 0
 			private set
 		
-		operator fun get(space: Space): Int = cache[space]!!
+		operator fun get(space: Space): Int = result[space]!!
 		operator fun plusAssign(space: Space)
 		{
-			cache += space to space.minSizePx
+			result += space to space.minSizePx
 		}
 		
 		fun calculate(margin: Int)
 		{
 			this.margin = margin
-			TODO("not implemented")
+			var remainMargin = margin
+			var remainSpaces = result.keys.filter { space ->
+				(space.fillWeight != null).alsoIf(false) {
+					remainMargin -= space.minSizePx
+					result[space] = space.minSizePx
+				}
+			}
+			while (remainSpaces.isNotEmpty())
+			{
+				val thisWeightSum = remainSpaces.sumByDouble { it.fillWeight!! }
+				val thisMargin = remainMargin
+				val filtered = remainSpaces.filter { space ->
+					val measuredSize =
+							if (thisWeightSum > 0.0) (thisMargin * space.fillWeight!! / thisWeightSum).toInt()
+							else thisMargin / remainSpaces.size
+					if (measuredSize < space.minSizePx)
+					{
+						remainMargin -= space.minSizePx
+						result[space] = space.minSizePx
+						false
+					}
+					else
+					{
+						result[space] = measuredSize
+						true
+					}
+				}
+				if (filtered.size != remainSpaces.size) remainSpaces = filtered
+				else break
+			}
 		}
 		
 		fun clear()
 		{
-			cache.clear()
+			result.clear()
 			margin = 0
 		}
 	}
 	
 	private val measure = Measure()
 	private var minSizeSum: Int = 0
-	private var weightSum: Double = 0.0
 	
 	@RecyclerView.Orientation
 	var orientation: Int = RecyclerView.VERTICAL
@@ -761,14 +806,12 @@ private class SpaceDecoration : RecyclerView.ItemDecoration()
 			field = value
 			measure.clear()
 			minSizeSum = 0
-			weightSum = 0.0
 		}
 	
 	operator fun plusAssign(space: Space)
 	{
 		measure += space
 		minSizeSum += space.minSizePx
-		weightSum += space.fillWeight ?: 0.0
 	}
 	
 	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = view.space?.let { space ->
