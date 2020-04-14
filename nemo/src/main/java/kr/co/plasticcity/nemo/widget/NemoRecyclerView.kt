@@ -18,26 +18,29 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewbinding.ViewBinding
 import kr.co.plasticcity.nemo.alsoIf
-import kr.co.plasticcity.nemo.databinding.NemoRecyclerViewSpaceBinding
 import kr.co.plasticcity.nemo.toPx
 import kr.co.plasticcity.nemo.widget.Layer.Group
-import kr.co.plasticcity.nemo.widget.Layer.Space
 import java.util.*
 import kotlin.math.roundToInt
 
 class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr)
 {
 	private val dividerDecoration: DividerDecoration = DividerDecoration()
-	private val spaceDecoration: SpaceDecoration = SpaceDecoration()
 	
 	init
 	{
 		addItemDecoration(dividerDecoration)
-		addItemDecoration(spaceDecoration)
 	}
 	
 	@DslMarker
 	private annotation class Marker
+	
+	@Marker
+	class ViewHolder(internal val binding: ViewBinding) : RecyclerView.ViewHolder(binding.root)
+	{
+		var modelPosition: Int = 0
+			internal set
+	}
 	
 	@Marker
 	interface Define
@@ -56,8 +59,6 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				view: (LayoutInflater, ViewGroup, Boolean) -> V,
 				tag: Any = Any(),
 				block: GroupDefine<M, V>.() -> Unit)
-		
-		fun space(block: SpaceDefine.() -> Unit)
 	}
 	
 	@Marker
@@ -74,13 +75,6 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 		var allowSwipeToDismiss: Boolean
 		
 		fun <PH : ViewBinding> placeholder(view: (LayoutInflater, ViewGroup, Boolean) -> PH, block: (ViewHolder.(binding: PH) -> Unit)? = null)
-	}
-	
-	@Marker
-	class ViewHolder(internal val binding: ViewBinding) : RecyclerView.ViewHolder(binding.root)
-	{
-		var modelPosition: Int = 0
-			internal set
 	}
 	
 	@Marker
@@ -106,20 +100,6 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			const val KEEP_ALPHA = -0x00000011
 			const val KEEP_POSITION = -0x00000021
 		}
-	}
-	
-	@Marker
-	interface SpaceDefine
-	{
-		var minSizeDp: Int
-		var fillWeight: Double?
-		
-		/**
-		 * ex) "#FFFFFFFF"
-		 */
-		var color: String?
-		var colorRes: Int
-		var drawableRes: Int
 	}
 	
 	interface GroupArrange
@@ -224,36 +204,8 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 						divider = divider
 				)
 			}
-			
-			override fun space(block: SpaceDefine.() -> Unit) = object : SpaceDefine
-			{
-				override var minSizeDp: Int = 0
-				override var fillWeight: Double? = null
-				override var color: String? = null
-				override var colorRes: Int = 0
-				override var drawableRes: Int = 0
-			}.let {
-				block(it)
-				when
-				{
-					it.drawableRes != 0 -> context.getDrawable(it.drawableRes)
-					it.colorRes != 0 -> ColorDrawable(context.getColor(it.colorRes))
-					it.color != null -> ColorDrawable(Color.parseColor(it.color))
-					else -> null
-				}.let { drawable ->
-					Space(
-							minSizePx = it.minSizeDp.toPx(),
-							fillWeight = it.fillWeight,
-							drawable = drawable
-					)
-				}
-			}.let { space ->
-				spaceDecoration += space
-				adapter += space
-			}
 		}.apply {
 			dividerDecoration.orientation = orientation
-			spaceDecoration.orientation = orientation
 			block()
 			this@NemoRecyclerView.layoutManager = LinearLayoutManager(context, orientation, reverseLayout)
 			this@NemoRecyclerView.adapter = adapter
@@ -304,14 +256,6 @@ private sealed class Layer(val tag: Any)
 			val keepPosition get() = show and 0x00000020 == 0
 		}
 	}
-	
-	class Space(val minSizePx: Int,
-	            val fillWeight: Double?,
-	            val drawable: Drawable?
-	) : Layer(Any())
-	{
-		override val size: Int = 1
-	}
 }
 
 private val Layer.isEmpty: Boolean
@@ -329,7 +273,6 @@ private val Layer.lastIndex: Int
 private sealed class Payload
 {
 	object UpdateDivider : Payload()
-	object UpdateSpace : Payload()
 }
 
 /*###################################################################################################################################
@@ -359,22 +302,9 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 		setHasStableIds(true)
 		registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver()
 		{
-			private fun notifyChangedToAllSpaces() = layerPosition.forEach { (position, layer) ->
-				if (layer is Space) notifyItemChanged(position, Payload.UpdateSpace)
-			}
-			
 			override fun onChanged()
 			{
 				reorder()
-				notifyChangedToAllSpaces()
-			}
-			
-			override fun onItemRangeChanged(positionStart: Int, itemCount: Int, payload: Any?)
-			{
-				if (payload !is Payload.UpdateSpace)
-				{
-					notifyChangedToAllSpaces()
-				}
 			}
 			
 			override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
@@ -398,7 +328,6 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					}
 				}
 				reorder()
-				notifyChangedToAllSpaces()
 			}
 			
 			override fun onItemRangeInserted(positionStart: Int, itemCount: Int) = layerAtPosition(positionStart).let { layer ->
@@ -419,7 +348,6 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					}
 				}
 				reorder()
-				notifyChangedToAllSpaces()
 			}
 			
 			override fun onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int)
@@ -438,15 +366,6 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 		group.model.adapter = this
 		group.model.adapterPosition = count
 		count += group.size
-	}
-	
-	operator fun plusAssign(space: Space)
-	{
-		layers[space.tag] = space
-		layerOrder += space
-		layerPosition[count] = space
-		layerArrayForViewType += space
-		count += space.size
 	}
 	
 	private fun reorder()
@@ -494,12 +413,6 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 					{
 						TODO("예외 던지기")
 					}
-				}
-			}
-			is Space ->
-			{
-				NemoRecyclerViewSpaceBinding.inflate(LayoutInflater.from(parent.context), parent, false).also { binding ->
-					binding.root.space = layer
 				}
 			}
 		}
@@ -560,7 +473,6 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 				if (layer.model.isNotEmpty) layerArrayForViewType.indexOf(layer)
 				else /* placeholder */ layerArrayForViewType.indexOf(layer).toPlaceholderViewType()
 			}
-			is Space -> layerArrayForViewType.indexOf(layer)
 		}
 	}
 	
@@ -579,10 +491,6 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 				{
 					Pair("placeholder", layerArrayForViewType.indexOf(layer).toPlaceholderViewType())
 				}
-			}
-			is Space ->
-			{
-				Pair("space", layerArrayForViewType.indexOf(layer))
 			}
 		}.let { (key, viewType) ->
 			if (key != null)
@@ -629,19 +537,11 @@ private class Adapter : RecyclerView.Adapter<NemoRecyclerView.ViewHolder>(), Nem
 /*###################################################################################################################################
  * ItemDecoration
  *###################################################################################################################################*/
-private const val VIEW_TAG_SPACE = 0x0D34A130
 private const val VIEW_TAG_DIVIDER = 0x0D34A131
 
 private var View.divider
 	get() = getTag(VIEW_TAG_DIVIDER) as? Group.Divider
 	set(value) = setTag(VIEW_TAG_DIVIDER, value)
-
-private var View.space
-	get() = getTag(VIEW_TAG_SPACE) as? Space
-	set(value) = setTag(VIEW_TAG_SPACE, value)
-
-private val View.hasSpace
-	get() = getTag(VIEW_TAG_SPACE) as? Space != null
 
 private class DividerDecoration : RecyclerView.ItemDecoration()
 {
@@ -729,196 +629,6 @@ private class DividerDecoration : RecyclerView.ItemDecoration()
 						left = right - divider.width
 						divider.draw((child.alpha * 255).toInt())
 					}
-				}
-			}
-		}
-		canvas.restore()
-	}
-}
-
-private class SpaceDecoration : RecyclerView.ItemDecoration()
-{
-	private class Measure
-	{
-		private val result = mutableMapOf<Space, Int>()
-		
-		val isEmpty
-			get() = result.isEmpty()
-		
-		var margin = 0
-			private set
-		
-		operator fun get(space: Space): Int = result[space]!!
-		operator fun plusAssign(space: Space)
-		{
-			result += space to space.minSizePx
-		}
-		
-		fun calculate(margin: Int)
-		{
-			this.margin = margin
-			var remainMargin = margin
-			var remainSpaces = result.keys.filter { space ->
-				(space.fillWeight != null).alsoIf(false) {
-					remainMargin -= space.minSizePx
-					result[space] = space.minSizePx
-				}
-			}
-			while (remainSpaces.isNotEmpty())
-			{
-				val thisWeightSum = remainSpaces.sumByDouble { it.fillWeight!! }
-				val thisMargin = remainMargin
-				val filtered = remainSpaces.filter { space ->
-					val measuredSize =
-							if (thisWeightSum > 0.0) (thisMargin * space.fillWeight!! / thisWeightSum).toInt()
-							else thisMargin / remainSpaces.size
-					if (measuredSize < space.minSizePx)
-					{
-						remainMargin -= space.minSizePx
-						result[space] = space.minSizePx
-						false
-					}
-					else
-					{
-						result[space] = measuredSize
-						true
-					}
-				}
-				if (filtered.size != remainSpaces.size) remainSpaces = filtered
-				else break
-			}
-		}
-		
-		fun clear()
-		{
-			result.clear()
-			margin = 0
-		}
-	}
-	
-	private val measure = Measure()
-	private var minSizeSum: Int = 0
-	
-	@RecyclerView.Orientation
-	var orientation: Int = RecyclerView.VERTICAL
-		set(value)
-		{
-			field = value
-			measure.clear()
-			minSizeSum = 0
-		}
-	
-	operator fun plusAssign(space: Space)
-	{
-		measure += space
-		minSizeSum += space.minSizePx
-	}
-	
-	override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) = view.space?.let { space ->
-		if (orientation == RecyclerView.VERTICAL)
-		{
-			val bounds = Rect()
-			parent.children.sumBy { child ->
-				if (!child.hasSpace)
-				{
-					parent.getDecoratedBoundsWithMargins(child, bounds)
-					bounds.bottom - bounds.top
-				}
-				else 0
-			}.let { sizeSum ->
-				if (sizeSum + minSizeSum >= parent.height)
-				{
-					outRect.set(0, space.minSizePx / 2, 0, space.minSizePx / 2)
-				}
-				else
-				{
-					val margin = parent.height - sizeSum
-					if (margin != measure.margin) measure.calculate(margin)
-					outRect.set(0, measure[space] / 2, 0, measure[space] / 2)
-				}
-			}
-		}
-		else  /* orientation == RecyclerView.HORIZONTAL) */
-		{
-			val bounds = Rect()
-			parent.children.sumBy { child ->
-				if (!child.hasSpace)
-				{
-					parent.getDecoratedBoundsWithMargins(child, bounds)
-					bounds.right - bounds.left
-				}
-				else 0
-			}.let { sizeSum ->
-				if (sizeSum + minSizeSum >= parent.width)
-				{
-					outRect.set(space.minSizePx / 2, 0, space.minSizePx / 2, 0)
-				}
-				else
-				{
-					val margin = parent.width - sizeSum
-					if (margin != measure.margin) measure.calculate(margin)
-					outRect.set(measure[space] / 2, 0, measure[space] / 2, 0)
-				}
-			}
-		}
-	} ?: Unit.also {
-		outRect.set(0, 0, 0, 0)
-	}
-	
-	override fun onDraw(canvas: Canvas, parent: RecyclerView, state: RecyclerView.State) = Rect().run {
-		if (parent.layoutManager == null || measure.isEmpty) return
-		
-		fun Space.draw(itemViewAlpha: Int)
-		{
-			drawable?.alpha = itemViewAlpha
-			drawable?.bounds = this@run
-			drawable?.draw(canvas)
-		}
-		
-		canvas.save()
-		if (orientation == RecyclerView.VERTICAL)
-		{
-			if (parent.clipToPadding)
-			{
-				left = parent.paddingLeft
-				right = parent.width - parent.paddingRight
-				canvas.clipRect(left, parent.paddingTop, right, parent.height - parent.paddingBottom)
-			}
-			else
-			{
-				left = 0
-				right = parent.width
-			}
-			val bounds = Rect()
-			parent.children.forEach { child ->
-				child.space?.let { space ->
-					parent.getDecoratedBoundsWithMargins(child, bounds)
-					top = bounds.top + child.translationY.roundToInt()
-					bottom = top + bounds.height()
-					space.draw((child.alpha * 255).toInt())
-				}
-			}
-		}
-		else /* orientation == RecyclerView.HORIZONTAL) */
-		{
-			if (parent.clipToPadding)
-			{
-				top = parent.paddingTop
-				bottom = parent.height - parent.paddingBottom
-				canvas.clipRect(parent.paddingLeft, top, parent.width - parent.paddingRight, bottom)
-			}
-			else
-			{
-				top = 0
-				bottom = parent.height
-			}
-			val bounds = Rect()
-			parent.children.forEach { child ->
-				child.space?.let { space ->
-					parent.getDecoratedBoundsWithMargins(child, bounds)
-					left = bounds.left + child.translationX.roundToInt()
-					right = left + bounds.width()
-					space.draw((child.alpha * 255).toInt())
 				}
 			}
 		}

@@ -42,21 +42,11 @@ class MainActivity : AppCompatActivity()
 		ActivityMainBinding.inflate(layoutInflater).also { binding ->
 			setContentView(binding.root)
 			recyclerView {
-				space {
-					color = "#ffff0000"
-					minSizeDp = 60
-					fillWeight = 0.0
-				}
 				group(header, ItemHeaderBinding::inflate) {
 					bind { data, binding ->
 						binding.title.text = data.title
 						binding.content.text = data.content
 					}
-				}
-				space {
-					color = "#ff00ff00"
-					minSizeDp = 60
-					fillWeight = 0.0
 				}
 				group(listHeader, ItemListHeaderBinding::inflate) {
 					val maxIndex = 100
@@ -138,11 +128,6 @@ class MainActivity : AppCompatActivity()
 						color = "#FF808080"
 						show = { BEGINNING and END and INCLUDE_PLACEHOLDER and KEEP_ALPHA and KEEP_POSITION }
 					}
-				}
-				space {
-					color = "#ff0000ff"
-					minSizeDp = 60
-					fillWeight = 0.0
 				}
 				group(NemoRecyclerView.model("null"), ItemFooterBinding::inflate) {
 					/* empty */
