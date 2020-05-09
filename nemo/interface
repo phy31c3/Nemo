@@ -4,9 +4,9 @@
 
 val header = NemoRecyclerView.model(headerDTO)
 val accounts = NemoRecyclerView.model<AccountDTO>(accountDTOs) { acno + bkcd } // key: if not define then key is hashcode or null
-val groups = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout = false) {
+val sections = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout = false) {
     useSnap = false
-    group("header", model = header, view = HeaderItemBinding::inflate) {
+    single("header", model = header, view = HeaderItemBinding::inflate) {
         bind { data, binding ->
 			adapterPosition
 			modelPosition
@@ -19,7 +19,7 @@ val groups = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout
             show = { BEGINNING and MIDDLE and END and INCLUDE_PLACEHOLDER and KEEP_ALPHA and KEEP_POSITION }
         }
     }
-    group("list", model = accounts, view = HeaderItemBinding::inflate) {
+    multi("list", model = accounts, view = HeaderItemBinding::inflate) {
 		allowDragAndDrop = false
 		allowSwipeToDismiss = false
 		bind { data, binding ->
@@ -32,8 +32,8 @@ val groups = nemoRecyclerView(orientation = RecyclerView.VERTICAL, reverseLayout
 		}
     }
 }
-groups.bringForward("header")
-groups.bringToFront("header")
-groups.sendBackward("header")
-groups.sendToBack("header")
-groups.swap("header", "list")
+sections.bringForward("header")
+sections.bringToFront("header")
+sections.sendBackward("header")
+sections.sendToBack("header")
+sections.swap("header", "list")
