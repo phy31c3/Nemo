@@ -1,1 +1,3 @@
-include ':demo', ':nemo'
+rootProject.name='Nemo'
+include ':app'
+include ':nemo'
