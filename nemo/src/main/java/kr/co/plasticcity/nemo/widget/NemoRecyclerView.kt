@@ -26,6 +26,13 @@ import kotlin.math.roundToInt
 
 class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr)
 {
+	companion object
+	{
+		fun <M> model(value: M, key: M.() -> Any? = { null }): Model.Singleton<M> = SingletonImpl(value, key)
+		fun <M> model(list: List<M>, key: M.() -> Any? = { null }): Model.List<M> = ListImpl(list, key)
+		fun <M> model(list: MutableList<M>, key: M.() -> Any? = { null }): Model.MutableList<M> = MutableListImpl(list, key)
+	}
+	
 	private val dividerDecoration: DividerDecoration = DividerDecoration()
 	
 	init
@@ -48,12 +55,16 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 	{
 		var useSnap: Boolean
 		
+		fun <V : ViewBinding> single(
+				view: (LayoutInflater, ViewGroup, Boolean) -> V,
+				tag: Any = Any(),
+				block: SingleDefine<Unit, V>.() -> Unit) = single(model(Unit), view, tag, block)
+		
 		fun <M, V : ViewBinding> single(
 				model: Model.Singleton<M>,
 				view: (LayoutInflater, ViewGroup, Boolean) -> V,
 				tag: Any = Any(),
-				block: SingleDefine<M, V>.() -> Unit
-		)
+				block: SingleDefine<M, V>.() -> Unit)
 		
 		fun <M, V : ViewBinding> multi(
 				model: Model.List<M>,
@@ -124,13 +135,6 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 		{
 			fun update(elements: Collection<M>)
 		}
-	}
-	
-	companion object
-	{
-		fun <M> model(value: M, key: M.() -> Any? = { null }): Model.Singleton<M> = SingletonImpl(value, key)
-		fun <M> model(list: List<M>, key: M.() -> Any? = { null }): Model.List<M> = ListImpl(list, key)
-		fun <M> model(list: MutableList<M>, key: M.() -> Any? = { null }): Model.MutableList<M> = MutableListImpl(list, key)
 	}
 	
 	@Suppress("RemoveRedundantQualifierName")
