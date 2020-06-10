@@ -16,7 +16,7 @@ publish {
 	userOrg = 'phy31c3'
 	groupId = 'kr.co.plasticcity'
 	artifactId = 'nemo'
-	publishVersion = '0.1.0'
+	publishVersion = '0.1.1'
 	desc = 'Android UI Library'
 	website = 'https://github.com/phy31c3/Nemo'
 	repository = "${website}.git"
