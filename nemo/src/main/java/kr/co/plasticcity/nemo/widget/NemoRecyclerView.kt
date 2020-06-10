@@ -26,6 +26,13 @@ import kotlin.math.roundToInt
 
 class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : RecyclerView(context, attrs, defStyleAttr)
 {
+	companion object
+	{
+		fun <M> model(value: M, key: M.() -> Any? = { null }): Model.Singleton<M> = SingletonImpl(value, key)
+		fun <M> model(list: List<M>, key: M.() -> Any? = { null }): Model.List<M> = ListImpl(list, key)
+		fun <M> model(list: MutableList<M>, key: M.() -> Any? = { null }): Model.MutableList<M> = MutableListImpl(list, key)
+	}
+	
 	private val dividerDecoration: DividerDecoration = DividerDecoration()
 	
 	init
@@ -48,17 +55,25 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 	{
 		var useSnap: Boolean
 		
+		fun <V : ViewBinding> single(
+				view: (LayoutInflater, ViewGroup, Boolean) -> V,
+				block: SingleDefine<Unit, V>.() -> Unit) = single(Any(), model(Unit), view, block)
+		
+		fun <V : ViewBinding> single(
+				tag: Any,
+				view: (LayoutInflater, ViewGroup, Boolean) -> V,
+				block: SingleDefine<Unit, V>.() -> Unit) = single(tag, model(Unit), view, block)
+		
 		fun <M, V : ViewBinding> single(
+				tag: Any = Any(),
 				model: Model.Singleton<M>,
 				view: (LayoutInflater, ViewGroup, Boolean) -> V,
-				tag: Any = Any(),
-				block: SingleDefine<M, V>.() -> Unit
-		)
+				block: SingleDefine<M, V>.() -> Unit)
 		
 		fun <M, V : ViewBinding> multi(
+				tag: Any = Any(),
 				model: Model.List<M>,
 				view: (LayoutInflater, ViewGroup, Boolean) -> V,
-				tag: Any = Any(),
 				block: MultiDefine<M, V>.() -> Unit)
 	}
 	
@@ -81,7 +96,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 	@Marker
 	interface DividerDefine
 	{
-		var sizeDp: Int
+		var sizeDp: Float
 		
 		/**
 		 * ex) "#FFFFFFFF"
@@ -126,13 +141,6 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 		}
 	}
 	
-	companion object
-	{
-		fun <M> model(value: M, key: M.() -> Any? = { null }): Model.Singleton<M> = SingletonImpl(value, key)
-		fun <M> model(list: List<M>, key: M.() -> Any? = { null }): Model.List<M> = ListImpl(list, key)
-		fun <M> model(list: MutableList<M>, key: M.() -> Any? = { null }): Model.MutableList<M> = MutableListImpl(list, key)
-	}
-	
 	@Suppress("RemoveRedundantQualifierName")
 	operator fun invoke(@RecyclerView.Orientation orientation: Int = VERTICAL,
 	                    reverseLayout: Boolean = false,
@@ -145,7 +153,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				set(value) = TODO("not implemented")
 			
 			@Suppress("UNCHECKED_CAST")
-			override fun <M, V : ViewBinding> single(model: Model.Singleton<M>, view: (LayoutInflater, ViewGroup, Boolean) -> V, tag: Any, block: SingleDefine<M, V>.() -> Unit) = object : SingleDefine<M, V>
+			override fun <M, V : ViewBinding> single(tag: Any, model: Model.Singleton<M>, view: (LayoutInflater, ViewGroup, Boolean) -> V, block: SingleDefine<M, V>.() -> Unit) = object : SingleDefine<M, V>
 			{
 				var onBind: ViewHolder.(Any?, ViewBinding) -> Unit = { _, _ -> }
 				var divider: Divider? = null
@@ -171,7 +179,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			}
 			
 			@Suppress("UNCHECKED_CAST")
-			override fun <M, V : ViewBinding> multi(model: Model.List<M>, view: (LayoutInflater, ViewGroup, Boolean) -> V, tag: Any, block: MultiDefine<M, V>.() -> Unit) = object : MultiDefine<M, V>
+			override fun <M, V : ViewBinding> multi(tag: Any, model: Model.List<M>, view: (LayoutInflater, ViewGroup, Boolean) -> V, block: MultiDefine<M, V>.() -> Unit) = object : MultiDefine<M, V>
 			{
 				var onBind: ViewHolder.(Any?, ViewBinding) -> Unit = { _, _ -> }
 				var placeholderProvider: ViewProvider? = null
@@ -676,7 +684,7 @@ private data class Divider constructor(val sizePx: Int,
 	{
 		fun create(context: Context, block: NemoRecyclerView.DividerDefine.() -> Unit) = object : NemoRecyclerView.DividerDefine
 		{
-			override var sizeDp: Int = 0
+			override var sizeDp: Float = 0.0f
 			override var color: String = "#00000000"
 			override var colorRes: Int = 0
 			override var drawableRes: Int = 0

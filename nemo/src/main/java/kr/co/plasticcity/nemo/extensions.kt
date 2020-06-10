@@ -8,5 +8,5 @@ internal inline fun Boolean.alsoIf(expect: Boolean, block: () -> Unit): Boolean
 	return this
 }
 
-internal fun Int.toDp(): Int = (this / Resources.getSystem().displayMetrics.density).toInt()
-internal fun Int.toPx(): Int = (this * Resources.getSystem().displayMetrics.density).toInt()
+internal fun Int.toDp(): Float = (this / Resources.getSystem().displayMetrics.density)
+internal fun Float.toPx(): Int = (this * Resources.getSystem().displayMetrics.density).toInt()
