@@ -57,19 +57,23 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 		
 		fun <V : ViewBinding> single(
 				view: (LayoutInflater, ViewGroup, Boolean) -> V,
-				tag: Any = Any(),
-				block: SingleDefine<Unit, V>.() -> Unit) = single(model(Unit), view, tag, block)
+				block: SingleDefine<Unit, V>.() -> Unit) = single(Any(), model(Unit), view, block)
+		
+		fun <V : ViewBinding> single(
+				tag: Any,
+				view: (LayoutInflater, ViewGroup, Boolean) -> V,
+				block: SingleDefine<Unit, V>.() -> Unit) = single(tag, model(Unit), view, block)
 		
 		fun <M, V : ViewBinding> single(
+				tag: Any = Any(),
 				model: Model.Singleton<M>,
 				view: (LayoutInflater, ViewGroup, Boolean) -> V,
-				tag: Any = Any(),
 				block: SingleDefine<M, V>.() -> Unit)
 		
 		fun <M, V : ViewBinding> multi(
+				tag: Any = Any(),
 				model: Model.List<M>,
 				view: (LayoutInflater, ViewGroup, Boolean) -> V,
-				tag: Any = Any(),
 				block: MultiDefine<M, V>.() -> Unit)
 	}
 	
@@ -149,7 +153,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 				set(value) = TODO("not implemented")
 			
 			@Suppress("UNCHECKED_CAST")
-			override fun <M, V : ViewBinding> single(model: Model.Singleton<M>, view: (LayoutInflater, ViewGroup, Boolean) -> V, tag: Any, block: SingleDefine<M, V>.() -> Unit) = object : SingleDefine<M, V>
+			override fun <M, V : ViewBinding> single(tag: Any, model: Model.Singleton<M>, view: (LayoutInflater, ViewGroup, Boolean) -> V, block: SingleDefine<M, V>.() -> Unit) = object : SingleDefine<M, V>
 			{
 				var onBind: ViewHolder.(Any?, ViewBinding) -> Unit = { _, _ -> }
 				var divider: Divider? = null
@@ -175,7 +179,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 			}
 			
 			@Suppress("UNCHECKED_CAST")
-			override fun <M, V : ViewBinding> multi(model: Model.List<M>, view: (LayoutInflater, ViewGroup, Boolean) -> V, tag: Any, block: MultiDefine<M, V>.() -> Unit) = object : MultiDefine<M, V>
+			override fun <M, V : ViewBinding> multi(tag: Any, model: Model.List<M>, view: (LayoutInflater, ViewGroup, Boolean) -> V, block: MultiDefine<M, V>.() -> Unit) = object : MultiDefine<M, V>
 			{
 				var onBind: ViewHolder.(Any?, ViewBinding) -> Unit = { _, _ -> }
 				var placeholderProvider: ViewProvider? = null
