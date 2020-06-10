@@ -92,7 +92,7 @@ class NemoRecyclerView @JvmOverloads constructor(context: Context, attrs: Attrib
 	@Marker
 	interface DividerDefine
 	{
-		var sizeDp: Int
+		var sizeDp: Float
 		
 		/**
 		 * ex) "#FFFFFFFF"
@@ -680,7 +680,7 @@ private data class Divider constructor(val sizePx: Int,
 	{
 		fun create(context: Context, block: NemoRecyclerView.DividerDefine.() -> Unit) = object : NemoRecyclerView.DividerDefine
 		{
-			override var sizeDp: Int = 0
+			override var sizeDp: Float = 0.0f
 			override var color: String = "#00000000"
 			override var colorRes: Int = 0
 			override var drawableRes: Int = 0

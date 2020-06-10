@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity()
 						binding.content.text = data.content
 					}
 					divider {
-						sizeDp = 2
+						sizeDp = 2.0f
 						color = "#FF808080"
 						show = { END }
 					}
@@ -129,7 +129,7 @@ class MainActivity : AppCompatActivity()
 						binding.text.text = "${data.key}"
 					}
 					divider {
-						sizeDp = 2
+						sizeDp = 2.0f
 						color = "#FF808080"
 						show = { BEGINNING and END and INCLUDE_PLACEHOLDER and KEEP_ALPHA and KEEP_POSITION }
 					}
